@@ -1,0 +1,103 @@
+{
+  "common": {
+    "appName": "Tool Tự Động",
+    "tagline": "An automated assistant for destiny readings",
+    "loading": "Processing",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "submit": "Submit",
+    "back": "Back"
+  },
+  "language": {
+    "label": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "form": {
+    "title": "Customer information",
+    "subtitle": "Provide the details below and let the system handle the reading",
+    "customerName": "Customer name",
+    "customerNamePlaceholder": "Enter the customer's full name",
+    "birthDate": "Date of birth (solar)",
+    "day": "Day",
+    "month": "Month",
+    "year": "Year",
+    "birthHour": "Hour of birth",
+    "hourPlaceholder": "Select the hour of birth",
+    "unknown": "Unknown",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "servicePackages": "Service packages",
+    "packagesHint": "You may select multiple packages",
+    "packageTuTru": "Bát Tự",
+    "packageTuTruDesc": "Four pillars, five elements, major cycles, annual fortune",
+    "packageMaiHoa": "Kinh Dịch",
+    "packageMaiHoaDesc": "Primary hexagram, changing lines, transformed hexagram",
+    "packageSim": "Phone number",
+    "packageSimDesc": "Numerology and feng shui analysis for a phone number",
+    "phoneNumber": "Phone number to analyse",
+    "phoneNumberPlaceholder": "e.g. 0901234567",
+    "runButton": "Begin reading",
+    "validation": {
+      "nameRequired": "Please enter the customer's name",
+      "birthRequired": "Please select a complete date of birth",
+      "packageRequired": "Please select at least one package",
+      "phoneRequired": "A phone number is required for the Sim package"
+    }
+  },
+  "status": {
+    "title": "Reading in progress",
+    "scraping": "Collecting source data from divination sites",
+    "analyzing": "Analysing each category with Gemini",
+    "synthesizing": "Composing the final narrative with Claude",
+    "savingSheet": "Saving the result to Google Sheet",
+    "done": "Completed",
+    "openDoc": "Open the Google Sheet",
+    "newRun": "Run another reading",
+    "preparingFor": "Preparing reading for",
+    "elapsed": "Elapsed time"
+  },
+  "prompts": {
+    "title": "System Prompts",
+    "subtitle": "Customize the prompt for each stage",
+    "openButton": "Edit prompts",
+    "tuTru": "Bát Tự",
+    "maiHoa": "Kinh Dịch",
+    "sim": "Sim Phong Thuỷ",
+    "synthesize": "Tổng hợp",
+    "save": "Save",
+    "reset": "Reset to default",
+    "cancel": "Cancel",
+    "close": "Close",
+    "saved": "Saved",
+    "loading": "Loading...",
+    "defaultBadge": "Default",
+    "customBadge": "Custom",
+    "saveError": "Failed to save"
+  },
+  "history": {
+    "title": "Reading history",
+    "subtitle": "Recent customers (read live from your Google Sheet)",
+    "empty": "No entries yet. Run your first reading.",
+    "loading": "Loading history...",
+    "error": "Failed to load history",
+    "refresh": "Refresh",
+    "openSheet": "Open Google Sheet",
+    "colTime": "Time",
+    "colName": "Name",
+    "colBirth": "DOB",
+    "colHour": "Hour",
+    "colGender": "Gender",
+    "colPhone": "Phone",
+    "colPackages": "Packages",
+    "colResult": "Result"
+  },
+  "errors": {
+    "missingFields": "Required fields are missing — please review the form",
+    "scraperFailed": "Failed to collect data from the divination site",
+    "aiFailed": "The AI service failed while analysing the data",
+    "docCreationFailed": "Failed to save the result to Google Sheet",
+    "unknownError": "An unknown error occurred"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "common": {
+    "appName": "Tool Tự Động",
+    "tagline": "Trợ lý luận giải vận mệnh tự động",
+    "loading": "Đang xử lý",
+    "error": "Đã xảy ra lỗi",
+    "retry": "Thử lại",
+    "submit": "Gửi",
+    "back": "Quay lại"
+  },
+  "language": {
+    "label": "Ngôn ngữ",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "form": {
+    "title": "Thông tin khách hàng",
+    "subtitle": "Điền đầy đủ thông tin để hệ thống tự động luận giải",
+    "customerName": "Họ và tên khách",
+    "customerNamePlaceholder": "Nhập họ và tên đầy đủ",
+    "birthDate": "Ngày sinh dương lịch",
+    "day": "Ngày",
+    "month": "Tháng",
+    "year": "Năm",
+    "birthHour": "Giờ sinh",
+    "hourPlaceholder": "Chọn giờ sinh",
+    "unknown": "Không rõ giờ",
+    "gender": "Giới tính",
+    "male": "Nam",
+    "female": "Nữ",
+    "servicePackages": "Gói dịch vụ",
+    "packagesHint": "Có thể chọn nhiều gói cùng lúc",
+    "packageTuTru": "Bát Tự",
+    "packageTuTruDesc": "Luận giải tứ trụ, ngũ hành, đại vận, lưu niên",
+    "packageMaiHoa": "Kinh Dịch",
+    "packageMaiHoaDesc": "Quẻ chính, hào động, quẻ biến và luận đoán",
+    "packageSim": "Sim Phong Thuỷ",
+    "packageSimDesc": "Phân tích số sim theo phong thủy",
+    "phoneNumber": "Số điện thoại cần xem",
+    "phoneNumberPlaceholder": "Ví dụ: 0901234567",
+    "runButton": "Bắt đầu luận giải",
+    "validation": {
+      "nameRequired": "Vui lòng nhập họ tên khách",
+      "birthRequired": "Vui lòng chọn ngày, tháng, năm sinh",
+      "packageRequired": "Vui lòng chọn ít nhất một gói",
+      "phoneRequired": "Vui lòng nhập số điện thoại để xem sim"
+    }
+  },
+  "status": {
+    "title": "Tiến trình luận giải",
+    "scraping": "Đang thu thập dữ liệu từ các trang luận giải",
+    "analyzing": "Đang phân tích từng phạm trù bằng Gemini",
+    "synthesizing": "Đang tổng hợp lời văn bằng Claude",
+    "savingSheet": "Đang lưu kết quả vào Google Sheet",
+    "done": "Hoàn tất",
+    "openDoc": "Mở Google Sheet",
+    "newRun": "Thực hiện luận giải khác",
+    "preparingFor": "Đang chuẩn bị cho",
+    "elapsed": "Thời gian đã trôi qua"
+  },
+  "prompts": {
+    "title": "System Prompts",
+    "subtitle": "Tùy chỉnh prompt cho từng giai đoạn luận giải",
+    "openButton": "Sửa prompt",
+    "tuTru": "Bát Tự",
+    "maiHoa": "Kinh Dịch",
+    "sim": "Sim Phong Thuỷ",
+    "synthesize": "Tổng hợp",
+    "save": "Lưu",
+    "reset": "Khôi phục mặc định",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "saved": "Đã lưu",
+    "loading": "Đang tải...",
+    "defaultBadge": "Mặc định",
+    "customBadge": "Đã chỉnh",
+    "saveError": "Không lưu được"
+  },
+  "history": {
+    "title": "Lịch sử luận giải",
+    "subtitle": "Tất cả các khách đã luận giải — lưu trong DB",
+    "empty": "Chưa có dữ liệu. Hãy thực hiện luận giải đầu tiên.",
+    "loading": "Đang tải lịch sử...",
+    "error": "Không tải được lịch sử",
+    "refresh": "Làm mới",
+    "openSheet": "Mở Google Sheet",
+    "colTime": "Thời gian",
+    "colName": "Họ tên",
+    "colBirth": "Ngày sinh",
+    "colHour": "Giờ",
+    "colGender": "Giới tính",
+    "colPhone": "SĐT",
+    "colPackages": "Gói",
+    "colResult": "Kết quả"
+  },
+  "errors": {
+    "missingFields": "Thiếu thông tin bắt buộc, vui lòng kiểm tra lại biểu mẫu",
+    "scraperFailed": "Không thể thu thập dữ liệu từ trang luận giải",
+    "aiFailed": "Hệ thống AI gặp lỗi khi phân tích dữ liệu",
+    "docCreationFailed": "Không thể lưu kết quả vào Google Sheet",
+    "unknownError": "Đã xảy ra lỗi không xác định"
+  }
+}

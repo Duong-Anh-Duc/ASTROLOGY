@@ -1,0 +1,33 @@
+{
+  "name": "tuvi-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "antd": "^6.4.3",
+    "date-fns": "^4.2.1",
+    "dayjs": "^1.11.20",
+    "lucide-react": "^0.460.0",
+    "next": "14.2.18",
+    "next-intl": "^3.25.0",
+    "react": "^18.3.1",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.18",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3"
+  }
+}
