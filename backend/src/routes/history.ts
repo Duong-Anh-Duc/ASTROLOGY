@@ -1,5 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../db/client';
+import { exportExists } from '../services/xlsx';
+
+function xlsxUrlIfExists(id: string): string | null {
+  if (!exportExists(id)) return null;
+  const origin = process.env.PUBLIC_BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+  return `${origin}/api/exports/${id}.xlsx`;
+}
 
 const router = Router();
 
@@ -60,6 +67,7 @@ router.get('/', async (req, res) => {
         imgSim: sm?.screenshotUrl ?? '',
         status: r.status,
         errorMessage: r.errorMessage,
+        xlsxUrl: xlsxUrlIfExists(r.id),
       };
     });
 
@@ -72,7 +80,17 @@ router.get('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.reading.delete({ where: { id: req.params.id } });
+    const id = req.params.id;
+    await prisma.reading.delete({ where: { id } });
+    // Best-effort cleanup of the generated xlsx file
+    try {
+      const { exportPathFor } = await import('../services/xlsx');
+      const fs = await import('node:fs');
+      const p = exportPathFor(id);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch {
+      // ignore
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'fail' });

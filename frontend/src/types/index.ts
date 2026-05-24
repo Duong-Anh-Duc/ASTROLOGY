@@ -45,7 +45,8 @@ export interface CostInfo {
 
 export interface ApiResponse {
   success: boolean;
-  sheetUrl?: string;
+  xlsxUrl?: string;
+  xlsxFileName?: string;
   cost?: CostInfo;
   error?: string;
 }
@@ -60,6 +61,6 @@ export type ProcessingStep =
   | 'scraping'
   | 'analyzing'
   | 'synthesizing'
-  | 'savingSheet'
+  | 'exporting'
   | 'done'
   | 'error';

@@ -1,5 +1,6 @@
 import { prisma } from '../db/client';
 import { warmPromptCache } from '../lib/store';
+import { warmSettingsCache } from '../lib/settings';
 import { scrapeMaiHoa } from '../scrapers/maiHoa';
 import { scrapeSimPhongThuy } from '../scrapers/simPhongThuy';
 import { scrapeTuTru } from '../scrapers/tuTru';
@@ -7,10 +8,11 @@ import {
   analyzeMaiHoa,
   analyzeSimPhongThuy,
   analyzeTuTru,
-} from '../ai/gemini';
-import { synthesize } from '../ai/claude';
+  synthesize,
+  currentProvider,
+} from '../ai/aiProvider';
 import { addUsage, calcCost, emptyUsage } from '../lib/usage';
-import { appendRow } from './sheet';
+import { generateXlsx } from './xlsx';
 import { saveScreenshot } from './storage';
 import type {
   CustomerInfo,
@@ -112,14 +114,17 @@ function formatByType(type: PackageType, a: Record<string, unknown>): string {
 export interface RunResult {
   success: boolean;
   readingId?: string;
-  sheetUrl?: string;
+  xlsxUrl?: string;
+  xlsxFileName?: string;
   cost?: ReturnType<typeof calcCost>;
   error?: string;
 }
 
 export async function runReading(customer: CustomerInfo): Promise<RunResult> {
-  // Warm prompt cache up-front so subsequent calls hit the loaded map.
+  // Warm caches up-front so subsequent calls hit loaded data.
   await warmPromptCache();
+  await warmSettingsCache();
+  console.log(`[runReading] AI provider = ${currentProvider()}`);
 
   // Persist customer + reading shell first so we have an ID for partial saves.
   const dbCustomer = await prisma.customer.create({
@@ -181,6 +186,7 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
     const cost = calcCost(totalUsage);
 
     // Persist Analysis rows + save screenshots locally
+    const screenshotPaths: Partial<Record<PackageType, string>> = {};
     for (let i = 0; i < scraperResults.length; i++) {
       const sr = scraperResults[i];
       const ai = analyses[i];
@@ -191,6 +197,7 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
           const saved = saveScreenshot(dbReading.id, sr.type, sr.screenshotPng);
           screenshotUrl = saved.url;
           screenshotPath = saved.filePath;
+          screenshotPaths[sr.type] = saved.filePath;
         } catch (e) {
           console.error(`[${dbReading.id}] save screenshot ${sr.type} failed:`, e);
         }
@@ -211,20 +218,25 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
       });
     }
 
-    // STEP 4: SHEET SYNC (best-effort, no Drive upload since service account
-    // has no Drive quota — images are stored locally on the BE instead).
-    console.log(`[${dbReading.id}] STEP 4 — sheet sync (text only)`);
-    let sheetUrl: string | undefined;
+    // STEP 4: EXPORT .xlsx
+    console.log(`[${dbReading.id}] STEP 4 — export xlsx`);
+    let xlsxUrl: string | undefined;
+    let xlsxFileName: string | undefined;
     try {
-      const result = await appendRow(customer, finalContent, {
-        cost,
+      const exported = await generateXlsx({
+        readingId: dbReading.id,
+        customer,
         analyses,
-        // screenshots intentionally omitted — Drive upload not possible
+        finalContent,
+        cost,
+        screenshotPaths,
+        provider: currentProvider(),
+        createdAt: dbReading.createdAt,
       });
-      sheetUrl = result.url;
-    } catch (sheetErr) {
-      const m = sheetErr instanceof Error ? sheetErr.message : String(sheetErr);
-      console.error(`[${dbReading.id}] sheet sync failed (continuing):`, m);
+      xlsxUrl = exported.url;
+      xlsxFileName = exported.fileName;
+    } catch (err) {
+      console.error(`[${dbReading.id}] xlsx export failed (continuing):`, err);
     }
 
     // Finalise reading
@@ -241,7 +253,7 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
       },
     });
 
-    return { success: true, readingId: dbReading.id, sheetUrl, cost };
+    return { success: true, readingId: dbReading.id, xlsxUrl, xlsxFileName, cost };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[${dbReading.id}] ERROR`, message);

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { DivinationForm } from '../../components/DivinationForm';
 import { HistoryTable } from '../../components/HistoryTable';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { ModelPanel } from '../../components/ModelPanel';
 import { PromptsPanel } from '../../components/PromptsPanel';
 import { StatusPanel } from '../../components/StatusPanel';
 import type {
@@ -18,7 +19,7 @@ import type {
 type RunState =
   | { kind: 'idle' }
   | { kind: 'running'; step: ProcessingStep; customer: CustomerInfo }
-  | { kind: 'done'; customer: CustomerInfo; sheetUrl: string; cost?: CostInfo }
+  | { kind: 'done'; customer: CustomerInfo; xlsxUrl: string; xlsxFileName?: string; cost?: CostInfo }
   | { kind: 'error'; customer: CustomerInfo; message: string };
 
 export default function HomePage() {
@@ -53,7 +54,7 @@ export default function HomePage() {
       () =>
         setState((s) =>
           s.kind === 'running' && s.step === 'synthesizing'
-            ? { ...s, step: 'savingSheet' }
+            ? { ...s, step: 'exporting' }
             : s,
         ),
       40000,
@@ -74,7 +75,7 @@ export default function HomePage() {
       clearTimeout(t2);
       clearTimeout(t3);
 
-      if (!res.ok || !body.success || !body.sheetUrl) {
+      if (!res.ok || !body.success || !body.xlsxUrl) {
         setState({
           kind: 'error',
           customer: data,
@@ -86,7 +87,8 @@ export default function HomePage() {
       setState({
         kind: 'done',
         customer: data,
-        sheetUrl: body.sheetUrl,
+        xlsxUrl: body.xlsxUrl,
+        xlsxFileName: body.xlsxFileName,
         cost: body.cost,
       });
       setHistoryRefresh((n) => n + 1);
@@ -123,6 +125,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          <ModelPanel />
           <PromptsPanel />
           <LanguageSwitcher />
         </div>
@@ -150,7 +153,8 @@ export default function HomePage() {
               <StatusPanel
                 step="done"
                 customerName={state.customer.fullName}
-                sheetUrl={state.sheetUrl}
+                xlsxUrl={state.xlsxUrl}
+                xlsxFileName={state.xlsxFileName}
                 cost={state.cost}
                 onRetry={() => startRun(state.customer)}
                 onReset={dismiss}

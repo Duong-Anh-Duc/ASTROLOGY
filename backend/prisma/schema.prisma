@@ -89,3 +89,9 @@ model PromptOverride {
   content   String   @db.Text
   updatedAt DateTime @updatedAt
 }
+
+model Setting {
+  key       String   @id // 'aiProvider' | 'geminiApiKey' | 'anthropicApiKey'
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}

@@ -49,11 +49,11 @@
   "status": {
     "title": "Tiến trình luận giải",
     "scraping": "Đang thu thập dữ liệu từ các trang luận giải",
-    "analyzing": "Đang phân tích từng phạm trù bằng Gemini",
-    "synthesizing": "Đang tổng hợp lời văn bằng Claude",
-    "savingSheet": "Đang lưu kết quả vào Google Sheet",
+    "analyzing": "Đang phân tích từng phạm trù",
+    "synthesizing": "Đang tổng hợp lời văn",
+    "exporting": "Đang xuất file Excel",
     "done": "Hoàn tất",
-    "openDoc": "Mở Google Sheet",
+    "downloadXlsx": "Tải file Excel",
     "newRun": "Thực hiện luận giải khác",
     "preparingFor": "Đang chuẩn bị cho",
     "elapsed": "Thời gian đã trôi qua"
@@ -74,6 +74,27 @@
     "loading": "Đang tải...",
     "defaultBadge": "Mặc định",
     "customBadge": "Đã chỉnh",
+    "saveError": "Không lưu được"
+  },
+  "model": {
+    "title": "Model AI",
+    "subtitle": "Chọn nhà cung cấp AI và nhập API key dùng cho phân tích + tổng hợp",
+    "openButton": "Model AI",
+    "providerLabel": "Nhà cung cấp",
+    "geminiKey": "Gemini API key",
+    "geminiKeyHint": "Lấy tại aistudio.google.com/app/apikey",
+    "anthropicKey": "Anthropic Claude API key",
+    "anthropicKeyHint": "Lấy tại console.anthropic.com",
+    "keyPresent": "Đã có key",
+    "keyMissing": "Chưa có key",
+    "keyFromDb": "đã lưu",
+    "keyFromEnv": "từ .env",
+    "noKey": "thiếu key",
+    "clearKey": "Xoá key đã lưu",
+    "storedNote": "Key được lưu phía server, không gửi ra trình duyệt",
+    "save": "Lưu",
+    "close": "Đóng",
+    "saved": "Đã lưu",
     "saveError": "Không lưu được"
   },
   "history": {

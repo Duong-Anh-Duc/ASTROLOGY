@@ -4,7 +4,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Circle,
-  ExternalLink,
+  Download,
   Loader2,
   RotateCcw,
   Sparkles,
@@ -27,7 +27,8 @@ interface CostInfo {
 interface StatusPanelProps {
   step: ProcessingStep;
   customerName: string;
-  sheetUrl?: string;
+  xlsxUrl?: string;
+  xlsxFileName?: string;
   cost?: CostInfo;
   errorMessage?: string;
   onRetry: () => void;
@@ -38,13 +39,14 @@ const STEPS: Exclude<ProcessingStep, 'idle' | 'done' | 'error'>[] = [
   'scraping',
   'analyzing',
   'synthesizing',
-  'savingSheet',
+  'exporting',
 ];
 
 export function StatusPanel({
   step,
   customerName,
-  sheetUrl,
+  xlsxUrl,
+  xlsxFileName,
   cost,
   errorMessage,
   onRetry,
@@ -114,15 +116,14 @@ export function StatusPanel({
         )}
 
         <div className="flex flex-col gap-3.5 sm:flex-row mt-2">
-          {sheetUrl && (
+          {xlsxUrl && (
             <a
-              href={sheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={xlsxUrl}
+              download={xlsxFileName ?? true}
               className="inline-flex h-12 flex-1 items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-[#3B82F6] via-[#6366F1] to-[#A855F7] px-6 text-sm font-bold text-white uppercase tracking-wider transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 hover:scale-[1.02] active:scale-98"
             >
-              <ExternalLink size={16} />
-              <span>{t('openDoc')}</span>
+              <Download size={16} />
+              <span>{t('downloadXlsx')}</span>
             </a>
           )}
           <Button

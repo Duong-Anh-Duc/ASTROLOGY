@@ -5,6 +5,8 @@ import { prisma } from './db/client';
 import runRoute from './routes/run';
 import historyRoute from './routes/history';
 import promptsRoute from './routes/prompts';
+import settingsRoute from './routes/settings';
+import exportsRoute from './routes/exports';
 import { UPLOADS_PATH } from './services/storage';
 
 const app = express();
@@ -25,6 +27,8 @@ app.get('/health', async (_req, res) => {
 app.use('/api/run', runRoute);
 app.use('/api/history', historyRoute);
 app.use('/api/prompts', promptsRoute);
+app.use('/api/settings', settingsRoute);
+app.use('/api/exports', exportsRoute);
 
 // Static: screenshots stored locally (Drive can't host them — service account has no quota)
 app.use('/uploads', express.static(UPLOADS_PATH, { maxAge: '1d' }));

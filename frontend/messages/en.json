@@ -49,11 +49,11 @@
   "status": {
     "title": "Reading in progress",
     "scraping": "Collecting source data from divination sites",
-    "analyzing": "Analysing each category with Gemini",
-    "synthesizing": "Composing the final narrative with Claude",
-    "savingSheet": "Saving the result to Google Sheet",
+    "analyzing": "Analysing each category",
+    "synthesizing": "Composing the final narrative",
+    "exporting": "Exporting Excel file",
     "done": "Completed",
-    "openDoc": "Open the Google Sheet",
+    "downloadXlsx": "Download Excel",
     "newRun": "Run another reading",
     "preparingFor": "Preparing reading for",
     "elapsed": "Elapsed time"
@@ -75,6 +75,27 @@
     "defaultBadge": "Default",
     "customBadge": "Custom",
     "saveError": "Failed to save"
+  },
+  "model": {
+    "title": "AI Model",
+    "subtitle": "Select the AI provider and enter the API key used for analysis + synthesis",
+    "openButton": "AI Model",
+    "providerLabel": "Provider",
+    "geminiKey": "Gemini API key",
+    "geminiKeyHint": "Get one at aistudio.google.com/app/apikey",
+    "anthropicKey": "Anthropic Claude API key",
+    "anthropicKeyHint": "Get one at console.anthropic.com",
+    "keyPresent": "Key configured",
+    "keyMissing": "No key",
+    "keyFromDb": "stored",
+    "keyFromEnv": "from .env",
+    "noKey": "no key",
+    "clearKey": "Clear stored key",
+    "storedNote": "Keys are stored on the server, never sent to the browser",
+    "save": "Save",
+    "close": "Close",
+    "saved": "Saved",
+    "saveError": "Save failed"
   },
   "history": {
     "title": "Reading history",

@@ -1,10 +1,11 @@
 'use client';
 
-import { ExternalLink, RefreshCw, Sparkles, BookOpen } from 'lucide-react';
+import { Download, RefreshCw, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 
 interface HistoryRow {
+  id: string;
   timestamp: string;
   fullName: string;
   birthDate: string;
@@ -20,6 +21,7 @@ interface HistoryRow {
   imgTuTru: string;
   imgMaiHoa: string;
   imgSim: string;
+  xlsxUrl: string | null;
 }
 
 interface HistoryTableProps {
@@ -102,7 +104,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
     setSearchTerm('');
   }, [refreshSignal]);
 
-  const cols: { key: keyof HistoryRow | 'stt' | 'images'; label: string; width: string }[] = [
+  const cols: { key: keyof HistoryRow | 'stt' | 'images' | 'download'; label: string; width: string }[] = [
     { key: 'stt', label: 'STT', width: 'w-[60px]' },
     { key: 'timestamp', label: t('colTime'), width: 'w-[150px]' },
     { key: 'fullName', label: t('colName'), width: 'w-[180px]' },
@@ -112,6 +114,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
     { key: 'phoneNumber', label: t('colPhone'), width: 'w-[130px]' },
     { key: 'packages', label: t('colPackages'), width: 'w-[180px]' },
     { key: 'cost', label: 'Chi phí', width: 'w-[100px]' },
+    { key: 'download', label: 'Excel', width: 'w-[90px]' },
     { key: 'summary', label: 'Xem chi tiết', width: 'w-auto' },
   ];
 
@@ -273,6 +276,21 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                           </span>
                         ) : (
                           <span className="text-text-tertiary">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3.5 text-center">
+                        {r.xlsxUrl ? (
+                          <a
+                            href={r.xlsxUrl}
+                            onClick={(e) => e.stopPropagation()}
+                            download
+                            className="inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/20 bg-[#EFF6FF] px-2.5 py-1 text-[10px] font-bold text-[#3B82F6] hover:bg-[#DBEAFE] transition-colors"
+                          >
+                            <Download size={11} />
+                            <span>Tải</span>
+                          </a>
+                        ) : (
+                          <span className="text-text-tertiary text-[10px]">—</span>
                         )}
                       </td>
                       <td className="px-3 py-3.5 text-xs text-text-secondary">
