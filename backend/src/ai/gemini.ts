@@ -29,7 +29,7 @@ void [DEFAULT_PROMPT_TU_TRU, DEFAULT_PROMPT_MAI_HOA, DEFAULT_PROMPT_SIM];
 /* ========================================================================= */
 
 const MODEL_NAME = 'gemini-3.1-pro-preview';
-const AI_TIMEOUT_MS = 60_000;
+const AI_TIMEOUT_MS = Number(process.env.GEMINI_ANALYSIS_TIMEOUT_MS ?? 10 * 60_000);
 
 function getClient(): GoogleGenerativeAI {
   const apiKey = getGeminiApiKey();
@@ -91,17 +91,26 @@ function parseJsonSafe(raw: string): Record<string, unknown> {
 
 type GeminiPart = string | { inlineData: { mimeType: string; data: string } };
 
+function promptRequiresJson(prompt: string): boolean {
+  return (
+    /YÊU CẦU TRẢ VỀ[\s\S]{0,80}JSON/i.test(prompt) ||
+    /JSON nghiêm ngặt/i.test(prompt) ||
+    /"fourPillars"|"primaryHexagram"|"phoneNumber"\s*:/i.test(prompt)
+  );
+}
+
 async function runGemini(
   systemPrompt: string,
   parts: GeminiPart[],
-): Promise<{ analysis: Record<string, unknown>; usage: { input: number; output: number } }> {
+  jsonOutput: boolean,
+): Promise<{ text: string; usage: { input: number; output: number } }> {
   const client = getClient();
   const model = client.getGenerativeModel({
     model: MODEL_NAME,
     systemInstruction: systemPrompt,
     generationConfig: {
       temperature: 0.6,
-      responseMimeType: 'application/json',
+      ...(jsonOutput ? { responseMimeType: 'application/json' } : {}),
     },
   });
 
@@ -109,7 +118,7 @@ async function runGemini(
     model.generateContent(parts as any),
     new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error('Gemini timed out after 60s')),
+        () => reject(new Error(`Gemini timed out after ${Math.round(AI_TIMEOUT_MS / 1000)}s`)),
         AI_TIMEOUT_MS,
       ),
     ),
@@ -118,12 +127,24 @@ async function runGemini(
   const text = result.response.text();
   const meta = result.response.usageMetadata;
   return {
-    analysis: parseJsonSafe(text),
+    text,
     usage: {
       input: meta?.promptTokenCount ?? 0,
       output: meta?.candidatesTokenCount ?? 0,
     },
   };
+}
+
+async function runGeminiAnalysis(
+  section: PackageType,
+  parts: GeminiPart[],
+): Promise<{ analysis: Record<string, unknown>; usage: { input: number; output: number } }> {
+  const prompt = getPrompt(section);
+  const jsonOutput = promptRequiresJson(prompt);
+  const { text, usage } = await runGemini(prompt, parts, jsonOutput);
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error(`Gemini ${section} returned an empty report`);
+  return { analysis: jsonOutput ? parseJsonSafe(trimmed) : { report: trimmed }, usage };
 }
 
 function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
@@ -134,11 +155,22 @@ function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | nul
 
 function customerBlock(customer: CustomerInfo): string {
   return [
-    `- Full name: ${customer.fullName}`,
-    `- Date of birth: ${customer.day}/${customer.month}/${customer.year}`,
-    `- Hour of birth: ${customer.hour ?? 'unknown'}`,
-    `- Gender: ${customer.gender}`,
-  ].join('\n');
+    `- Họ tên: ${customer.fullName}`,
+    `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}`,
+    `- Giờ sinh: ${customer.hour === null ? 'Không rõ' : `${customer.hour}:${String(customer.minute ?? 0).padStart(2, '0')}`}`,
+    `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
+    customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
+    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
+    customer.question ? `- Việc cần xem: ${customer.question}` : '',
+    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function actualCustomerInstruction(customer: CustomerInfo): string {
+  return `DỮ LIỆU THỰC TẾ CỦA LƯỢT LUẬN GIẢI NÀY:
+${customerBlock(customer)}
+
+Các tên, danh xưng, ví dụ hoặc tình tiết khách hàng có sẵn trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên. Luôn dùng dữ liệu thực tế này. Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
 }
 
 export async function analyzeTuTru(
@@ -147,32 +179,47 @@ export async function analyzeTuTru(
 ): Promise<GeminiAnalysis> {
   const image = parseDataUrl(rawText);
   const parts: GeminiPart[] = [
-    `CUSTOMER:\n${customerBlock(customer)}\n\nBÁT TỰ TỨ TRỤ CHART (image attached). Read every cell of the chart — pillars, branches, hidden stems, ten gods, luck cycles. Then analyse strictly per the JSON schema.`,
+    `${actualCustomerInstruction(customer)}\n\nBÁT TỰ TỨ TRỤ CHART${image ? ' được đính kèm trong request này' : ''}. Đọc kỹ từng ô trên lá số và thực hiện đúng cấu trúc đầu ra mà prompt hệ thống yêu cầu.`,
   ];
   if (image) {
     parts.push({ inlineData: image });
   } else {
     parts[0] += `\n\nRAW DATA:\n${rawText}`;
   }
-  const { analysis, usage } = await runGemini(getPrompt('tuTru'), parts);
+  const { analysis, usage } = await runGeminiAnalysis('tuTru', parts);
   return { type: 'tuTru' satisfies PackageType, analysis, usage };
 }
 
 export async function analyzeMaiHoa(
   rawText: string,
   customer: CustomerInfo,
+  chartImage?: string,
 ): Promise<GeminiAnalysis> {
-  const prompt = `CUSTOMER:\n${customerBlock(customer)}\n\nRAW MAI HOA DATA:\n${rawText}`;
-  const { analysis, usage } = await runGemini(getPrompt('maiHoa'), [prompt]);
+  const prompt = `${actualCustomerInstruction(customer)}
+
+ẢNH QUẺ KINH DỊCH${chartImage ? ' được đính kèm trong request này. Hãy đọc ảnh trước theo yêu cầu trong prompt hệ thống.' : ' không trích xuất được; chỉ kết luận điều có thể xác nhận từ dữ liệu text.'}
+
+DỮ LIỆU TEXT TỪ TRANG LẬP QUẺ:
+${rawText}`;
+  const parts: GeminiPart[] = [prompt];
+  if (chartImage) parts.push({ inlineData: { mimeType: 'image/jpeg', data: chartImage } });
+  const { analysis, usage } = await runGeminiAnalysis('maiHoa', parts);
   return { type: 'maiHoa' satisfies PackageType, analysis, usage };
 }
 
 export async function analyzeSimPhongThuy(
   rawText: string,
   phoneNumber: string,
+  customer?: CustomerInfo,
+  chartImage?: string,
 ): Promise<GeminiAnalysis> {
-  const prompt = `PHONE NUMBER: ${phoneNumber}\n\nRAW NUMEROLOGY DATA:\n${rawText}`;
-  const { analysis, usage } = await runGemini(getPrompt('sim'), [prompt]);
+  const prompt = `${customer ? actualCustomerInstruction(customer) : `SỐ ĐIỆN THOẠI: ${phoneNumber}`}
+
+DỮ LIỆU TEXT PHONG THỦY SIM:
+${rawText}`;
+  const parts: GeminiPart[] = [prompt];
+  if (chartImage) parts.push({ inlineData: { mimeType: 'image/jpeg', data: chartImage } });
+  const { analysis, usage } = await runGeminiAnalysis('sim', parts);
   return { type: 'sim' satisfies PackageType, analysis, usage };
 }
 
@@ -183,6 +230,9 @@ function customerBlockVi(customer: CustomerInfo): string {
     `- Giờ sinh: ${customer.hour ?? 'Không rõ'}`,
     `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
     customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
+    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
+    customer.question ? `- Việc cần xem: ${customer.question}` : '',
+    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
   ]
     .filter(Boolean)
     .join('\n');

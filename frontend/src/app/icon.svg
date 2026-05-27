@@ -1,17 +1,13 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="14" fill="#0F0A1F"/>
-  <rect width="64" height="64" rx="14" fill="url(#bg)" opacity="0.6"/>
-  <path d="M 42 16 A 18 18 0 1 0 42 48 A 14 14 0 1 1 42 16 Z" fill="#C9A961"/>
-  <circle cx="14" cy="18" r="1.4" fill="#C9A961"/>
-  <circle cx="20" cy="11" r="0.9" fill="#C9A961"/>
-  <circle cx="11" cy="32" r="0.9" fill="#C9A961"/>
-  <circle cx="16" cy="46" r="1.4" fill="#C9A961"/>
-  <circle cx="24" cy="55" r="0.9" fill="#C9A961"/>
-  <circle cx="50" cy="54" r="1.1" fill="#C9A961"/>
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="50%" r="65%">
-      <stop offset="0%" stop-color="#241A3F"/>
-      <stop offset="100%" stop-color="#0F0A1F"/>
-    </radialGradient>
-  </defs>
+  <rect width="64" height="64" rx="14" fill="#1A1F36"/>
+  <!-- Library icon (lucide-style, stroked in gold) scaled to 64x64 grid (lucide native: 24x24 → scale 2x, offset to center) -->
+  <g transform="translate(8, 8) scale(2)" stroke="#C9A961" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- book spines: 4 vertical bars like Lucide Library -->
+    <line x1="4"  y1="4"  x2="4"  y2="20"/>
+    <line x1="8"  y1="8"  x2="8"  y2="20"/>
+    <line x1="12" y1="6"  x2="12" y2="20"/>
+    <path d="M16 6l4 14"/>
+    <!-- base shelf -->
+    <line x1="2" y1="20" x2="22" y2="20"/>
+  </g>
 </svg>

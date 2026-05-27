@@ -109,7 +109,7 @@ export function PromptsPanel() {
           <div className="flex w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div className="flex flex-col gap-0.5">
-                <h2 className="text-base font-bold tracking-wide text-text-primary flex items-center gap-2">
+                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
                   <Settings2 size={16} className="text-[#3B82F6]" />
                   {t('title')}
                 </h2>

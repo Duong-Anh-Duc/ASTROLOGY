@@ -19,6 +19,9 @@ export interface CustomerInfo {
   packages: PackageType[];
   phoneNumber?: string;
   question?: string; // "việc cần xem" — used by maiHoa & sim
+  addressing?: string; // how the report should address the customer
+  additionalContext?: string; // per-reading facts and requests, never global prompt content
+  includeSynthesis?: boolean; // true = generate the combined summary tab
   useSolarTerms?: boolean; // "Dùng lịch tiết khí" — maiHoa & sim
   yearcalc?: number; // tuTru "Năm tính", default = current year
 }
@@ -60,6 +63,6 @@ export type ProcessingStep =
   | 'scraping'
   | 'analyzing'
   | 'synthesizing'
-  | 'savingSheet'
+  | 'exporting'
   | 'done'
   | 'error';

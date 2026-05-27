@@ -23,42 +23,45 @@ enum ReadingStatus {
 }
 
 model Customer {
-  id           String    @id @default(cuid())
-  fullName     String
-  day          Int
-  month        Int
-  year         Int
-  hour         Int?
-  minute       Int       @default(0)
-  isLunar      Boolean   @default(false)
-  gender       String // 'male' | 'female'
-  phoneNumber  String?
-  createdAt    DateTime  @default(now())
-  readings     Reading[]
+  id          String    @id @default(cuid())
+  fullName    String
+  day         Int
+  month       Int
+  year        Int
+  hour        Int?
+  minute      Int       @default(0)
+  isLunar     Boolean   @default(false)
+  gender      String // 'male' | 'female'
+  phoneNumber String?
+  createdAt   DateTime  @default(now())
+  readings    Reading[]
 
   @@index([fullName])
   @@index([createdAt])
 }
 
 model Reading {
-  id              String        @id @default(cuid())
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  packages        PackageType[]
-  question        String?
-  useSolarTerms   Boolean       @default(false)
-  yearcalc        Int?
-  status          ReadingStatus @default(pending)
-  synthesis       String? // markdown synthesis from Claude/Gemini
-  inputTokens     Int           @default(0)
-  outputTokens    Int           @default(0)
-  costUsd         Float         @default(0)
-  costVnd         Int           @default(0)
-  errorMessage    String?
-  sheetRowIndex   Int? // index of the synced row in Google Sheet (null if not synced)
-  createdAt       DateTime      @default(now())
-  finishedAt      DateTime?
-  analyses        Analysis[]
+  id                String        @id @default(cuid())
+  customerId        String
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  packages          PackageType[]
+  question          String?
+  addressing        String?
+  additionalContext String?       @db.Text
+  includeSynthesis  Boolean       @default(true)
+  useSolarTerms     Boolean       @default(false)
+  yearcalc          Int?
+  status            ReadingStatus @default(pending)
+  synthesis         String? // markdown synthesis from Claude/Gemini
+  inputTokens       Int           @default(0)
+  outputTokens      Int           @default(0)
+  costUsd           Float         @default(0)
+  costVnd           Int           @default(0)
+  errorMessage      String?
+  sheetRowIndex     Int? // index of the synced row in Google Sheet (null if not synced)
+  createdAt         DateTime      @default(now())
+  finishedAt        DateTime?
+  analyses          Analysis[]
 
   @@index([customerId])
   @@index([createdAt])
@@ -66,11 +69,11 @@ model Reading {
 }
 
 model Analysis {
-  id              String      @id @default(cuid())
-  readingId       String
-  reading         Reading     @relation(fields: [readingId], references: [id], onDelete: Cascade)
-  type            PackageType
-  rawText         String      @db.Text // raw scraped text (or data URL for tuTru image)
+  id             String      @id @default(cuid())
+  readingId      String
+  reading        Reading     @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  type           PackageType
+  rawText        String      @db.Text // raw scraped text (or data URL for tuTru image)
   analysisJson   Json // structured JSON from Gemini
   formattedText  String      @db.Text // human-readable text for display
   screenshotUrl  String? // Google Drive public URL (thumbnail)

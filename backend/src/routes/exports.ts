@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import fs from 'node:fs';
+import path from 'node:path';
 import { prisma } from '../db/client';
-import { exportExists, exportPathFor } from '../services/xlsx';
+import { exportExists, exportPathFor, generateXlsx } from '../services/xlsx';
+import { generateCombinedXlsx } from '../services/xlsxCombined';
+import { getAiProvider } from '../lib/settings';
+import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 
 const router = Router();
 
@@ -10,6 +14,34 @@ function fileNameFor(reading: { id: string; createdAt: Date; customer: { fullNam
   const stamp = reading.createdAt.toISOString().slice(0, 19).replace(/[:T]/g, '-');
   return `LuanGiai_${safe}_${stamp}.xlsx`;
 }
+
+// POST /api/exports/combined — generate combined xlsx for all readings
+router.post('/combined', async (_req, res) => {
+  try {
+    const result = await generateCombinedXlsx();
+    res.json({ success: true, xlsxUrl: result.url, xlsxFileName: result.fileName });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'fail' });
+  }
+});
+
+// GET /api/exports/combined/:filename — download a previously generated combined file
+router.get('/combined/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!filename.startsWith('combined_') || !filename.endsWith('.xlsx')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const filePath = path.join(path.dirname(exportPathFor('_')), filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  );
+  const stat = fs.statSync(filePath);
+  res.setHeader('Content-Length', String(stat.size));
+  fs.createReadStream(filePath).pipe(res);
+});
 
 router.get('/:id.xlsx', async (req, res) => {
   const id = req.params.id;
@@ -34,6 +66,72 @@ router.get('/:id.xlsx', async (req, res) => {
     const stat = fs.statSync(filePath);
     res.setHeader('Content-Length', String(stat.size));
     fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'fail' });
+  }
+});
+
+// POST /api/exports/:id — regenerate xlsx for an existing reading
+router.post('/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const reading = await prisma.reading.findUnique({
+      where: { id },
+      include: { customer: true, analyses: true },
+    });
+    if (!reading) return res.status(404).json({ error: 'Reading not found' });
+
+    const c = reading.customer;
+    const customer: CustomerInfo = {
+      fullName: c.fullName,
+      day: c.day,
+      month: c.month,
+      year: c.year,
+      hour: c.hour ?? null,
+      minute: c.minute,
+      isLunar: c.isLunar,
+      gender: c.gender as 'male' | 'female',
+      packages: reading.packages as PackageType[],
+      phoneNumber: c.phoneNumber ?? undefined,
+      question: reading.question ?? undefined,
+      addressing: reading.addressing ?? undefined,
+      additionalContext: reading.additionalContext ?? undefined,
+      useSolarTerms: reading.useSolarTerms,
+      yearcalc: reading.yearcalc ?? undefined,
+    };
+
+    const analyses: GeminiAnalysis[] = reading.analyses.map((a) => ({
+      type: a.type as PackageType,
+      analysis: a.analysisJson as Record<string, unknown>,
+      usage: { input: a.inputTokens, output: a.outputTokens },
+    }));
+
+    const screenshotPaths: Partial<Record<PackageType, string>> = {};
+    for (const a of reading.analyses) {
+      if (a.screenshotPath && fs.existsSync(a.screenshotPath)) {
+        screenshotPaths[a.type as PackageType] = a.screenshotPath;
+      }
+    }
+
+    const cost = {
+      inputTokens: reading.inputTokens,
+      outputTokens: reading.outputTokens,
+      usd: reading.costUsd,
+      vnd: reading.costVnd,
+    };
+
+    const result = await generateXlsx({
+      readingId: id,
+      customer,
+      analyses,
+      finalContent: reading.synthesis ?? '',
+      cost,
+      screenshotPaths,
+      provider: getAiProvider(),
+      createdAt: reading.createdAt,
+    });
+
+    res.json({ success: true, xlsxUrl: result.url, xlsxFileName: result.fileName });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'fail' });
   }

@@ -1,12 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db/client';
-import { exportExists } from '../services/xlsx';
-
-function xlsxUrlIfExists(id: string): string | null {
-  if (!exportExists(id)) return null;
-  const origin = process.env.PUBLIC_BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
-  return `${origin}/api/exports/${id}.xlsx`;
-}
+import { formatByType } from '../services/xlsx';
 
 const router = Router();
 
@@ -50,16 +44,22 @@ router.get('/', async (req, res) => {
         id: r.id,
         timestamp: r.createdAt.toISOString(),
         fullName: r.customer.fullName,
-        birthDate: `${r.customer.day}/${r.customer.month}/${r.customer.year}`,
-        birthHour: r.customer.hour === null ? '' : `${r.customer.hour}h${r.customer.minute || ''}`.replace(/h0$/, 'h'),
+        birthDate: `${String(r.customer.day).padStart(2, '0')}/${String(r.customer.month).padStart(2, '0')}/${r.customer.year}`,
+        birthHour: r.customer.hour === null ? '' : `${String(r.customer.hour).padStart(2, '0')}:${String(r.customer.minute ?? 0).padStart(2, '0')}`,
         gender: r.customer.gender === 'male' ? 'Nam' : 'Nữ',
         phoneNumber: r.customer.phoneNumber ?? '',
         packages: r.packages.map((p) =>
           p === 'tuTru' ? 'Bát Tự' : p === 'maiHoa' ? 'Kinh Dịch' : 'Sim Phong Thuỷ',
         ).join(', '),
-        analysisTuTru: tt?.formattedText ?? '',
-        analysisMaiHoa: mh?.formattedText ?? '',
-        analysisSim: sm?.formattedText ?? '',
+        analysisTuTru:
+          tt?.formattedText ||
+          (tt ? formatByType('tuTru', tt.analysisJson as Record<string, unknown>) : ''),
+        analysisMaiHoa:
+          mh?.formattedText ||
+          (mh ? formatByType('maiHoa', mh.analysisJson as Record<string, unknown>) : ''),
+        analysisSim:
+          sm?.formattedText ||
+          (sm ? formatByType('sim', sm.analysisJson as Record<string, unknown>) : ''),
         summary: r.synthesis ?? '',
         cost: r.costVnd > 0 ? String(r.costVnd) : '',
         imgTuTru: tt?.screenshotUrl ?? '',
@@ -67,7 +67,6 @@ router.get('/', async (req, res) => {
         imgSim: sm?.screenshotUrl ?? '',
         status: r.status,
         errorMessage: r.errorMessage,
-        xlsxUrl: xlsxUrlIfExists(r.id),
       };
     });
 

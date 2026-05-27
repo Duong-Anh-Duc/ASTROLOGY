@@ -6,6 +6,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from './ui/Button';
 
 type Provider = 'gemini' | 'claude';
+type SectionKey = 'tuTru' | 'maiHoa' | 'sim' | 'synthesize';
+
+const SECTION_KEYS: SectionKey[] = ['tuTru', 'maiHoa', 'sim', 'synthesize'];
 
 interface KeyInfo {
   present: boolean;
@@ -15,6 +18,7 @@ interface KeyInfo {
 
 interface SettingsView {
   provider: Provider;
+  sectionProviders: Record<SectionKey, Provider>;
   geminiKey: KeyInfo;
   anthropicKey: KeyInfo;
 }
@@ -34,8 +38,13 @@ export function ModelPanel() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<SettingsView | null>(null);
   const [provider, setProvider] = useState<Provider>('gemini');
+  const [sectionProviders, setSectionProviders] = useState<Record<SectionKey, Provider>>({
+    tuTru: 'gemini', maiHoa: 'gemini', sim: 'gemini', synthesize: 'gemini',
+  });
   const [geminiKeyDraft, setGeminiKeyDraft] = useState('');
   const [anthropicKeyDraft, setAnthropicKeyDraft] = useState('');
+  const [geminiKeyOriginal, setGeminiKeyOriginal] = useState('');
+  const [anthropicKeyOriginal, setAnthropicKeyOriginal] = useState('');
   const [showGemini, setShowGemini] = useState(false);
   const [showAnthropic, setShowAnthropic] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,13 +53,24 @@ export function ModelPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(backendUrl('/api/settings'), { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = (await res.json()) as SettingsView;
+      const [settingsRes, keysRes] = await Promise.all([
+        fetch(backendUrl('/api/settings'), { cache: 'no-store' }),
+        fetch(backendUrl('/api/settings/keys'), { cache: 'no-store' }),
+      ]);
+      if (!settingsRes.ok) throw new Error(`HTTP ${settingsRes.status}`);
+      const body = (await settingsRes.json()) as SettingsView;
+      const keys = keysRes.ok
+        ? ((await keysRes.json()) as { geminiApiKey?: string | null; anthropicApiKey?: string | null })
+        : {};
+      const gk = keys.geminiApiKey ?? '';
+      const ak = keys.anthropicApiKey ?? '';
       setView(body);
       setProvider(body.provider);
-      setGeminiKeyDraft('');
-      setAnthropicKeyDraft('');
+      setSectionProviders(body.sectionProviders);
+      setGeminiKeyDraft(gk);
+      setGeminiKeyOriginal(gk);
+      setAnthropicKeyDraft(ak);
+      setAnthropicKeyOriginal(ak);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'load failed');
     }
@@ -67,15 +87,16 @@ export function ModelPanel() {
   const dirty =
     view !== null &&
     (provider !== view.provider ||
-      geminiKeyDraft.trim().length > 0 ||
-      anthropicKeyDraft.trim().length > 0);
+      SECTION_KEYS.some((k) => sectionProviders[k] !== view.sectionProviders[k]) ||
+      geminiKeyDraft.trim() !== geminiKeyOriginal.trim() ||
+      anthropicKeyDraft.trim() !== anthropicKeyOriginal.trim());
 
   const save = async () => {
     setSaving(true);
     setStatus('idle');
     setErrorMsg('');
     try {
-      const payload: Record<string, unknown> = { provider };
+      const payload: Record<string, unknown> = { provider, sectionProviders };
       if (geminiKeyDraft.trim().length > 0) payload.geminiApiKey = geminiKeyDraft.trim();
       if (anthropicKeyDraft.trim().length > 0) payload.anthropicApiKey = anthropicKeyDraft.trim();
       const res = await fetch(backendUrl('/api/settings'), {
@@ -90,8 +111,9 @@ export function ModelPanel() {
       const body = (await res.json()) as SettingsView & { success: boolean };
       setView(body);
       setProvider(body.provider);
-      setGeminiKeyDraft('');
-      setAnthropicKeyDraft('');
+      setSectionProviders(body.sectionProviders);
+      setGeminiKeyOriginal(geminiKeyDraft.trim());
+      setAnthropicKeyOriginal(anthropicKeyDraft.trim());
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2000);
     } catch (e) {
@@ -115,6 +137,8 @@ export function ModelPanel() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (which === 'gemini') { setGeminiKeyDraft(''); setGeminiKeyOriginal(''); }
+      else { setAnthropicKeyDraft(''); setAnthropicKeyOriginal(''); }
       await load();
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 1500);
@@ -150,7 +174,7 @@ export function ModelPanel() {
           <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div className="flex flex-col gap-0.5">
-                <h2 className="text-base font-bold tracking-wide text-text-primary flex items-center gap-2">
+                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
                   <Bot size={16} className="text-[#7C3AED]" />
                   {t('title')}
                 </h2>
@@ -164,7 +188,7 @@ export function ModelPanel() {
             <div className="flex flex-col gap-5 p-5">
               {/* Provider picker */}
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                <label className="text-xs font-semibold text-text-secondary">
                   {t('providerLabel')}
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -200,6 +224,52 @@ export function ModelPanel() {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Per-section model */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-text-secondary">
+                  {t('perSectionLabel')}
+                </label>
+                <div className="flex flex-col gap-1.5">
+                  {(
+                    [
+                      { key: 'tuTru' as SectionKey, label: t('sectionTuTru') },
+                      { key: 'maiHoa' as SectionKey, label: t('sectionMaiHoa') },
+                      { key: 'sim' as SectionKey, label: t('sectionSim') },
+                      { key: 'synthesize' as SectionKey, label: t('sectionSynthesize') },
+                    ] as const
+                  ).map(({ key, label }) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-[#F7F8FC] px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-[#1A1F36]">{label}</span>
+                      <div className="flex gap-1">
+                        {PROVIDER_DEFS.map(({ value, icon: Icon, iconText }) => {
+                          const active = sectionProviders[key] === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() =>
+                                setSectionProviders((prev) => ({ ...prev, [key]: value }))
+                              }
+                              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold capitalize transition-all ${
+                                active
+                                  ? 'bg-[#3B82F6] text-white shadow-sm'
+                                  : `bg-white border border-gray-200 hover:border-gray-300 ${iconText}`
+                              }`}
+                            >
+                              <Icon size={11} />
+                              {value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -311,7 +381,7 @@ function KeyField({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">{label}</label>
+        <label className="text-xs font-semibold text-text-secondary">{label}</label>
         {info && info.present && (
           <span className="flex items-center gap-2 text-[10px] text-text-tertiary">
             <span className="font-mono">{info.masked}</span>
@@ -338,7 +408,7 @@ function KeyField({
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
-          className="h-11 w-full rounded border border-gray-200 bg-[#F7F8FC] pl-9 pr-20 text-sm text-[#1A1F36] placeholder:text-text-tertiary focus:border-accent-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent-primary/10 transition-all"
+          className="h-11 w-full rounded border border-gray-200 bg-[#F7F8FC] pl-9 pr-10 text-sm text-[#1A1F36] placeholder:text-text-tertiary focus:border-accent-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent-primary/10 transition-all"
         />
         <button
           type="button"

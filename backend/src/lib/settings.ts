@@ -1,10 +1,22 @@
 import { prisma } from '../db/client';
 
 export type AiProvider = 'gemini' | 'claude';
+export type SectionKey = 'tuTru' | 'maiHoa' | 'sim' | 'synthesize';
 
-export type SettingKey = 'aiProvider' | 'geminiApiKey' | 'anthropicApiKey';
+type SectionProviderKey = `aiProvider_${SectionKey}`;
+export type SettingKey = 'aiProvider' | 'geminiApiKey' | 'anthropicApiKey' | SectionProviderKey;
 
-const ALL_KEYS: SettingKey[] = ['aiProvider', 'geminiApiKey', 'anthropicApiKey'];
+export const SECTION_KEYS: SectionKey[] = ['tuTru', 'maiHoa', 'sim', 'synthesize'];
+
+const ALL_KEYS: SettingKey[] = [
+  'aiProvider',
+  'geminiApiKey',
+  'anthropicApiKey',
+  'aiProvider_tuTru',
+  'aiProvider_maiHoa',
+  'aiProvider_sim',
+  'aiProvider_synthesize',
+];
 
 let cache: Partial<Record<SettingKey, string>> | null = null;
 
@@ -35,6 +47,12 @@ export function getAiProvider(): AiProvider {
   return isProvider(v) ? v : 'gemini';
 }
 
+export function getAiProviderForSection(section: SectionKey): AiProvider {
+  const key: SectionProviderKey = `aiProvider_${section}`;
+  const v = cache?.[key];
+  return isProvider(v) ? v : getAiProvider();
+}
+
 export function getGeminiApiKey(): string | undefined {
   const v = cache?.geminiApiKey?.trim();
   if (v) return v;
@@ -57,6 +75,7 @@ function maskKey(k: string | undefined): string {
 
 export interface SettingsView {
   provider: AiProvider;
+  sectionProviders: Record<SectionKey, AiProvider>;
   geminiKey: {
     present: boolean;
     source: 'db' | 'env' | 'none';
@@ -84,6 +103,12 @@ export async function getSettingsView(): Promise<SettingsView> {
 
   return {
     provider: getAiProvider(),
+    sectionProviders: {
+      tuTru: getAiProviderForSection('tuTru'),
+      maiHoa: getAiProviderForSection('maiHoa'),
+      sim: getAiProviderForSection('sim'),
+      synthesize: getAiProviderForSection('synthesize'),
+    },
     geminiKey: {
       present: geminiSource !== 'none',
       source: geminiSource,
@@ -99,13 +124,22 @@ export async function getSettingsView(): Promise<SettingsView> {
 
 export interface SettingsUpdate {
   provider?: AiProvider;
-  geminiApiKey?: string | null; // null clears DB override (fall back to env)
+  sectionProviders?: Partial<Record<SectionKey, AiProvider | null>>;
+  geminiApiKey?: string | null;
   anthropicApiKey?: string | null;
 }
 
 export async function setSettings(updates: SettingsUpdate): Promise<void> {
   const writes: { key: SettingKey; value: string | null }[] = [];
   if (updates.provider) writes.push({ key: 'aiProvider', value: updates.provider });
+  if (updates.sectionProviders) {
+    for (const section of SECTION_KEYS) {
+      const v = updates.sectionProviders[section];
+      if (v !== undefined) {
+        writes.push({ key: `aiProvider_${section}`, value: v });
+      }
+    }
+  }
   if (updates.geminiApiKey !== undefined) {
     writes.push({ key: 'geminiApiKey', value: updates.geminiApiKey });
   }

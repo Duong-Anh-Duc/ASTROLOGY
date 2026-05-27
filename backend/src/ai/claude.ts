@@ -7,8 +7,10 @@ import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 export { DEFAULT_PROMPT_SYNTHESIZE as SYSTEM_PROMPT_SYNTHESIZE } from '../lib/defaults';
 
 const MODEL_NAME = 'claude-sonnet-4-5-20250929';
-const AI_TIMEOUT_MS = 120_000;
-const MAX_TOKENS = 8192;
+const ANALYSIS_TIMEOUT_MS = Number(process.env.CLAUDE_ANALYSIS_TIMEOUT_MS ?? 10 * 60_000);
+const SYNTHESIS_TIMEOUT_MS = Number(process.env.CLAUDE_SYNTHESIS_TIMEOUT_MS ?? 10 * 60_000);
+const MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS ?? 8192);
+const REPORT_MAX_TOKENS = Number(process.env.CLAUDE_REPORT_MAX_TOKENS ?? 16_000);
 
 function getClient(): Anthropic {
   const apiKey = getAnthropicApiKey();
@@ -22,12 +24,30 @@ function customerBlock(customer: CustomerInfo): string {
   return [
     `- Họ tên: ${customer.fullName}`,
     `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}`,
-    `- Giờ sinh: ${customer.hour ?? 'Không rõ'}`,
+    `- Giờ sinh: ${customer.hour === null ? 'Không rõ' : `${customer.hour}:${String(customer.minute ?? 0).padStart(2, '0')}`}`,
     `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
     customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
+    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
+    customer.question ? `- Việc cần xem: ${customer.question}` : '',
+    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+function actualCustomerInstruction(customer: CustomerInfo): string {
+  return `DỮ LIỆU THỰC TẾ CỦA LƯỢT LUẬN GIẢI NÀY:
+${customerBlock(customer)}
+
+Các tên, danh xưng, ví dụ hoặc tình tiết khách hàng có sẵn trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên. Luôn dùng dữ liệu thực tế này. Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
+}
+
+function promptRequiresJson(prompt: string): boolean {
+  return (
+    /YÊU CẦU TRẢ VỀ[\s\S]{0,80}JSON/i.test(prompt) ||
+    /JSON nghiêm ngặt/i.test(prompt) ||
+    /"fourPillars"|"primaryHexagram"|"phoneNumber"\s*:/i.test(prompt)
+  );
 }
 
 function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
@@ -41,6 +61,15 @@ function extractText(message: Anthropic.Message): string {
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
     .join('');
+}
+
+function extractToolJson(message: Anthropic.Message): Record<string, unknown> | null {
+  for (const block of message.content) {
+    if (block.type === 'tool_use' && block.name === 'return_analysis_json') {
+      return block.input as Record<string, unknown>;
+    }
+  }
+  return null;
 }
 
 function extractFirstJsonObject(s: string): string | null {
@@ -90,26 +119,30 @@ function parseJsonSafe(raw: string): Record<string, unknown> {
 async function runClaude(
   systemPrompt: string,
   userContent: ContentBlockParam[],
-  options: { json?: boolean; timeoutMs?: number } = {},
+  options: { json?: boolean; timeoutMs?: number; maxTokens?: number } = {},
 ): Promise<{ text: string; usage: { input: number; output: number } }> {
   const client = getClient();
-  const timeoutMs = options.timeoutMs ?? AI_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? ANALYSIS_TIMEOUT_MS;
+  const maxTokens = options.maxTokens ?? MAX_TOKENS;
 
   const systemForJson = options.json
     ? `${systemPrompt}\n\nQuan trọng: phản hồi DUY NHẤT là JSON hợp lệ theo schema yêu cầu, KHÔNG bọc \`\`\`, KHÔNG giải thích trước/sau.`
     : systemPrompt;
 
-  const message = await Promise.race([
-    client.messages.create({
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
       model: MODEL_NAME,
-      max_tokens: MAX_TOKENS,
+      max_tokens: maxTokens,
       system: systemForJson,
       messages: [{ role: 'user', content: userContent }],
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Claude timed out after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs),
-    ),
-  ]);
+    }, { timeout: timeoutMs, maxRetries: 0 });
+  } catch (err) {
+    if (err instanceof Anthropic.APIConnectionTimeoutError) {
+      throw new Error(`Claude timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  }
 
   return {
     text: extractText(message),
@@ -120,12 +153,99 @@ async function runClaude(
   };
 }
 
+async function runClaudeJson(
+  section: PackageType,
+  systemPrompt: string,
+  userContent: ContentBlockParam[],
+): Promise<{ analysis: Record<string, unknown>; usage: { input: number; output: number } }> {
+  const { text, usage, message } = await (async () => {
+    const client = getClient();
+    const timeoutMs = ANALYSIS_TIMEOUT_MS;
+    const systemForJson = `${systemPrompt}\n\nQuan trọng: hãy gọi tool return_analysis_json với object JSON đúng schema. Không trả lời bằng text thường.`;
+
+    let message: Anthropic.Message;
+    try {
+      message = await client.messages.create({
+        model: MODEL_NAME,
+        max_tokens: MAX_TOKENS,
+        system: systemForJson,
+        messages: [{ role: 'user', content: userContent }],
+        tools: [
+          {
+            name: 'return_analysis_json',
+            description: 'Return the requested analysis as one valid JSON object.',
+            input_schema: {
+              type: 'object',
+              properties: {
+                analysis: {
+                  type: 'string',
+                  description:
+                    'Use this field for the full prose analysis when the prompt asks for a complete written article instead of specific JSON fields.',
+                },
+              },
+              additionalProperties: true,
+            },
+          },
+        ],
+        tool_choice: { type: 'tool', name: 'return_analysis_json' },
+      }, { timeout: timeoutMs, maxRetries: 0 });
+    } catch (err) {
+      if (err instanceof Anthropic.APIConnectionTimeoutError) {
+        throw new Error(`Claude timed out after ${Math.round(timeoutMs / 1000)}s`);
+      }
+      throw err;
+    }
+
+    return {
+      text: extractText(message),
+      message,
+      usage: {
+        input: message.usage?.input_tokens ?? 0,
+        output: message.usage?.output_tokens ?? 0,
+      },
+    };
+  })();
+
+  const toolJson = extractToolJson(message);
+  if (toolJson) return { analysis: toolJson, usage };
+
+  console.warn(
+    `[claude:${section}] Tool JSON missing, falling back to text parse. Preview: ${text.slice(0, 500)}`,
+  );
+  try {
+    return { analysis: parseJsonSafe(text), usage };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'invalid JSON';
+    throw new Error(`Claude ${section} did not return valid JSON: ${message}`);
+  }
+}
+
+async function runClaudeAnalysis(
+  section: PackageType,
+  userContent: ContentBlockParam[],
+): Promise<{ analysis: Record<string, unknown>; usage: { input: number; output: number } }> {
+  const prompt = getPrompt(section);
+  if (promptRequiresJson(prompt)) {
+    return runClaudeJson(section, prompt, userContent);
+  }
+
+  const { text, usage } = await runClaude(prompt, userContent, {
+    timeoutMs: ANALYSIS_TIMEOUT_MS,
+    maxTokens: REPORT_MAX_TOKENS,
+  });
+  const report = text.trim();
+  if (!report) throw new Error(`Claude ${section} returned an empty report`);
+  return { analysis: { report }, usage };
+}
+
 export async function analyzeTuTru(
   rawText: string,
   customer: CustomerInfo,
 ): Promise<GeminiAnalysis> {
   const image = parseDataUrl(rawText);
-  const userText = `CUSTOMER:\n${customerBlock(customer)}\n\nBÁT TỰ TỨ TRỤ CHART${image ? ' (xem ảnh đính kèm)' : ''}. Đọc kỹ từng ô trên lá số — trụ, can chi, tàng can, thập thần, đại vận — rồi phân tích đúng JSON schema.`;
+  const userText = `${actualCustomerInstruction(customer)}
+
+BÁT TỰ TỨ TRỤ CHART${image ? ' được đính kèm trong request này' : ''}. Đọc kỹ từng ô trên lá số, gồm trụ, can chi, tàng can, thập thần, đại vận và lưu niên. Thực hiện đúng cấu trúc đầu ra mà prompt hệ thống yêu cầu.`;
 
   const content: ContentBlockParam[] = [];
   if (image) {
@@ -142,26 +262,53 @@ export async function analyzeTuTru(
     content.push({ type: 'text', text: `${userText}\n\nRAW DATA:\n${rawText}` });
   }
 
-  const { text, usage } = await runClaude(getPrompt('tuTru'), content, { json: true });
-  return { type: 'tuTru' satisfies PackageType, analysis: parseJsonSafe(text), usage };
+  const { analysis, usage } = await runClaudeAnalysis('tuTru', content);
+  return { type: 'tuTru' satisfies PackageType, analysis, usage };
 }
 
 export async function analyzeMaiHoa(
   rawText: string,
   customer: CustomerInfo,
+  chartImage?: string,
 ): Promise<GeminiAnalysis> {
-  const userText = `CUSTOMER:\n${customerBlock(customer)}\n\nRAW MAI HOA DATA:\n${rawText}`;
-  const { text, usage } = await runClaude(getPrompt('maiHoa'), [{ type: 'text', text: userText }], { json: true });
-  return { type: 'maiHoa' satisfies PackageType, analysis: parseJsonSafe(text), usage };
+  const userText = `${actualCustomerInstruction(customer)}
+
+ẢNH QUẺ KINH DỊCH${chartImage ? ' được đính kèm trong request này. Hãy đọc ảnh trước theo yêu cầu trong prompt hệ thống.' : ' không trích xuất được; chỉ kết luận điều có thể xác nhận từ dữ liệu text.'}
+
+DỮ LIỆU TEXT TỪ TRANG LẬP QUẺ:
+${rawText}`;
+  const content: ContentBlockParam[] = [];
+  if (chartImage) {
+    content.push({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: chartImage },
+    });
+  }
+  content.push({ type: 'text', text: userText });
+  const { analysis, usage } = await runClaudeAnalysis('maiHoa', content);
+  return { type: 'maiHoa' satisfies PackageType, analysis, usage };
 }
 
 export async function analyzeSimPhongThuy(
   rawText: string,
   phoneNumber: string,
+  customer?: CustomerInfo,
+  chartImage?: string,
 ): Promise<GeminiAnalysis> {
-  const userText = `PHONE NUMBER: ${phoneNumber}\n\nRAW NUMEROLOGY DATA:\n${rawText}`;
-  const { text, usage } = await runClaude(getPrompt('sim'), [{ type: 'text', text: userText }], { json: true });
-  return { type: 'sim' satisfies PackageType, analysis: parseJsonSafe(text), usage };
+  const userText = `${customer ? actualCustomerInstruction(customer) : `SỐ ĐIỆN THOẠI: ${phoneNumber}`}
+
+DỮ LIỆU TEXT PHONG THỦY SIM:
+${rawText}`;
+  const content: ContentBlockParam[] = [];
+  if (chartImage) {
+    content.push({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: chartImage },
+    });
+  }
+  content.push({ type: 'text', text: userText });
+  const { analysis, usage } = await runClaudeAnalysis('sim', content);
+  return { type: 'sim' satisfies PackageType, analysis, usage };
 }
 
 export async function synthesize(
@@ -180,7 +327,7 @@ export async function synthesize(
   const { text, usage } = await runClaude(
     getPrompt('synthesize'),
     [{ type: 'text', text: userMessage }],
-    { timeoutMs: AI_TIMEOUT_MS },
+    { timeoutMs: SYNTHESIS_TIMEOUT_MS },
   );
 
   const trimmed = text.trim();

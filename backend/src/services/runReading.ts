@@ -10,14 +10,15 @@ import {
   analyzeTuTru,
   synthesize,
   currentProvider,
+  providerForSection,
 } from '../ai/aiProvider';
 import { addUsage, calcCost, emptyUsage } from '../lib/usage';
-import { generateXlsx } from './xlsx';
 import { saveScreenshot } from './storage';
 import type {
   CustomerInfo,
   GeminiAnalysis,
   PackageType,
+  ProcessingStep,
   ScraperResult,
 } from '../types';
 
@@ -33,12 +34,170 @@ const PACKAGE_LABELS: Record<PackageType, string> = {
   sim: 'Sim Phong Thuỷ',
 };
 
+const HEARTBEAT_MS = 30_000;
+
+function elapsed(start: number): string {
+  const ms = Date.now() - start;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function trackTask<T>(
+  readingId: string,
+  label: string,
+  work: () => Promise<T>,
+  options: {
+    heartbeatMs?: number;
+    summarize?: (result: T) => string;
+  } = {},
+): Promise<T> {
+  const start = Date.now();
+  console.log(`[${readingId}] ${label} — start`);
+
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  if (options.heartbeatMs) {
+    heartbeat = setInterval(() => {
+      console.log(`[${readingId}] ${label} — still running after ${elapsed(start)}`);
+    }, options.heartbeatMs);
+  }
+
+  try {
+    const result = await work();
+    const summary = options.summarize?.(result);
+    console.log(
+      `[${readingId}] ${label} — done in ${elapsed(start)}${summary ? ` — ${summary}` : ''}`,
+    );
+    return result;
+  } catch (err) {
+    console.error(`[${readingId}] ${label} — error after ${elapsed(start)}: ${errorMessage(err)}`);
+    throw err;
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+  }
+}
+
+function summarizeScrape(result: ScraperResult): string {
+  return `raw=${result.rawText.length.toLocaleString('vi-VN')} chars, screenshot=${result.screenshotPng ? 'yes' : 'no'}`;
+}
+
+function summarizeAnalysis(result: GeminiAnalysis): string {
+  return `tokens in=${result.usage?.input ?? 0}, out=${result.usage?.output ?? 0}`;
+}
+
 function bullet(list: unknown): string {
   if (!Array.isArray(list)) return '';
   return list
     .map((x) => (typeof x === 'string' ? `• ${x}` : ''))
     .filter(Boolean)
     .join('\n');
+}
+
+function titleFromKey(key: string): string {
+  const labels: Record<string, string> = {
+    opening: 'Lời mở đầu',
+    banMenhNguHanh: 'Bản mệnh và ngũ hành',
+    ban_menh_ngu_hanh: 'Bản mệnh và ngũ hành',
+    tenGoiBiDanh: 'Tên gọi và bí danh',
+    ten_goi_bi_danh: 'Tên gọi và bí danh',
+    ungDungPhongThuy: 'Ứng dụng phong thủy',
+    ung_dung_phong_thuy: 'Ứng dụng phong thủy',
+    daiVanNamHienTai: 'Đại vận và năm hiện tại',
+    dai_van_nam_hien_tai: 'Đại vận và năm hiện tại',
+    loiKhuyen: 'Lời khuyên chân thành',
+    loi_khuyen: 'Lời khuyên chân thành',
+    loiKet: 'Lời kết',
+    loi_ket: 'Lời kết',
+    displayText: 'Phân tích',
+    report: 'Phân tích',
+    content: 'Phân tích',
+    text: 'Phân tích',
+  };
+  if (labels[key]) return labels[key];
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-zà-ỹ])([A-ZÀ-Ỹ])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+const PROSE_KEY_ORDER = [
+  'opening',
+  'loiMoDau',
+  'loi_mo_dau',
+  'banMenhNguHanh',
+  'ban_menh_ngu_hanh',
+  'tenGoiBiDanh',
+  'ten_goi_bi_danh',
+  'ungDungPhongThuy',
+  'ung_dung_phong_thuy',
+  'daiVanNamHienTai',
+  'dai_van_nam_hien_tai',
+  'loiKhuyen',
+  'loi_khuyen',
+  'loiKet',
+  'loi_ket',
+];
+
+function sortAnalysisKeys(keys: string[]): string[] {
+  return [...keys].sort((a, b) => {
+    const ai = PROSE_KEY_ORDER.indexOf(a);
+    const bi = PROSE_KEY_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
+function stringifyAnalysisValue(value: unknown, depth = 0): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (!value) return '';
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        const text = stringifyAnalysisValue(item, depth + 1);
+        return text ? `• ${text}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    const keys = Object.keys(object);
+    if (keys.length === 1) {
+      const onlyKey = keys[0];
+      if (
+        onlyKey === '$PARAMETER_NAME' ||
+        onlyKey === 'analysis' ||
+        onlyKey === 'report' ||
+        onlyKey === 'result' ||
+        onlyKey === 'tuTru'
+      ) {
+        return stringifyAnalysisValue(object[onlyKey], depth);
+      }
+    }
+
+    return sortAnalysisKeys(keys)
+      .map((key) => {
+        const text = stringifyAnalysisValue(object[key], depth + 1);
+        if (!text) return '';
+        return depth === 0 ? `═══ ${titleFromKey(key).toUpperCase()} ═══\n${text}` : text;
+      })
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  return '';
+}
+
+function fallbackFormatAnalysis(a: Record<string, unknown>): string {
+  return stringifyAnalysisValue(a).trim();
 }
 
 function formatTuTru(a: Record<string, unknown>): string {
@@ -106,9 +265,9 @@ function formatSim(a: Record<string, unknown>): string {
 }
 
 function formatByType(type: PackageType, a: Record<string, unknown>): string {
-  if (type === 'tuTru') return formatTuTru(a);
-  if (type === 'maiHoa') return formatMaiHoa(a);
-  return formatSim(a);
+  const formatted =
+    type === 'tuTru' ? formatTuTru(a) : type === 'maiHoa' ? formatMaiHoa(a) : formatSim(a);
+  return formatted.trim() || fallbackFormatAnalysis(a);
 }
 
 export interface RunResult {
@@ -120,11 +279,17 @@ export interface RunResult {
   error?: string;
 }
 
-export async function runReading(customer: CustomerInfo): Promise<RunResult> {
+type ProgressCallback = (
+  step: Exclude<ProcessingStep, 'idle' | 'done' | 'error'>,
+) => void;
+
+export async function runReading(
+  customer: CustomerInfo,
+  onProgress?: ProgressCallback,
+): Promise<RunResult> {
   // Warm caches up-front so subsequent calls hit loaded data.
   await warmPromptCache();
   await warmSettingsCache();
-  console.log(`[runReading] AI provider = ${currentProvider()}`);
 
   // Persist customer + reading shell first so we have an ID for partial saves.
   const dbCustomer = await prisma.customer.create({
@@ -146,47 +311,138 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
       customerId: dbCustomer.id,
       packages: customer.packages,
       question: customer.question ?? null,
+      addressing: customer.addressing ?? null,
+      additionalContext: customer.additionalContext ?? null,
       useSolarTerms: customer.useSolarTerms ?? false,
       yearcalc: customer.yearcalc ?? null,
       status: 'running',
     },
   });
 
+  const providerSummary = [
+    `global=${currentProvider()}`,
+    `tuTru=${providerForSection('tuTru')}`,
+    `maiHoa=${providerForSection('maiHoa')}`,
+    `sim=${providerForSection('sim')}`,
+    `synthesize=${providerForSection('synthesize')}`,
+  ].join(', ');
+  console.log(
+    `[${dbReading.id}] RUN — start packages=${customer.packages.join(',')} providers: ${providerSummary}`,
+  );
+
   try {
     // STEP 1: SCRAPE (parallel)
-    console.log(`[${dbReading.id}] STEP 1 — scrape ${customer.packages.join(',')}`);
+    onProgress?.('scraping');
+    console.log(`[${dbReading.id}] STEP 1 — scrape all — start`);
     const scrapeJobs: Promise<ScraperResult>[] = [];
-    if (customer.packages.includes('tuTru')) scrapeJobs.push(scrapeTuTru(customer));
-    if (customer.packages.includes('maiHoa')) scrapeJobs.push(scrapeMaiHoa(customer));
+    if (customer.packages.includes('tuTru')) {
+      scrapeJobs.push(
+        trackTask(dbReading.id, 'STEP 1.1 — scrape tuTru', () => scrapeTuTru(customer), {
+          heartbeatMs: HEARTBEAT_MS,
+          summarize: summarizeScrape,
+        }),
+      );
+    }
+    if (customer.packages.includes('maiHoa')) {
+      scrapeJobs.push(
+        trackTask(dbReading.id, 'STEP 1.2 — scrape maiHoa', () => scrapeMaiHoa(customer), {
+          heartbeatMs: HEARTBEAT_MS,
+          summarize: summarizeScrape,
+        }),
+      );
+    }
     if (customer.packages.includes('sim') && customer.phoneNumber) {
-      scrapeJobs.push(scrapeSimPhongThuy(customer.phoneNumber, customer));
+      scrapeJobs.push(
+        trackTask(
+          dbReading.id,
+          'STEP 1.3 — scrape sim',
+          () => scrapeSimPhongThuy(customer.phoneNumber as string, customer),
+          {
+            heartbeatMs: HEARTBEAT_MS,
+            summarize: summarizeScrape,
+          },
+        ),
+      );
     }
     const scraperResults = await Promise.all(scrapeJobs);
+    console.log(`[${dbReading.id}] STEP 1 — scrape all — done (${scraperResults.length} result(s))`);
 
     // STEP 2: GEMINI ANALYSE
-    console.log(`[${dbReading.id}] STEP 2 — analyse`);
+    onProgress?.('analyzing');
+    console.log(`[${dbReading.id}] STEP 2 — analyse all — start`);
     const analysisJobs: Promise<GeminiAnalysis>[] = scraperResults.map((r) => {
-      if (r.type === 'tuTru') return analyzeTuTru(r.rawText, customer);
-      if (r.type === 'maiHoa') return analyzeMaiHoa(r.rawText, customer);
+      const provider = providerForSection(r.type);
+      if (r.type === 'tuTru') {
+        return trackTask(
+          dbReading.id,
+          `STEP 2.${r.type} — analyse tuTru via ${provider}`,
+          () => analyzeTuTru(r.rawText, customer),
+          { heartbeatMs: HEARTBEAT_MS, summarize: summarizeAnalysis },
+        );
+      }
+      if (r.type === 'maiHoa') {
+        return trackTask(
+          dbReading.id,
+          `STEP 2.${r.type} — analyse maiHoa via ${provider}`,
+          () => analyzeMaiHoa(r.rawText, customer, r.screenshotPng),
+          { heartbeatMs: HEARTBEAT_MS, summarize: summarizeAnalysis },
+        );
+      }
       if (r.type === 'sim' && customer.phoneNumber) {
-        return analyzeSimPhongThuy(r.rawText, customer.phoneNumber);
+        return trackTask(
+          dbReading.id,
+          `STEP 2.${r.type} — analyse sim via ${provider}`,
+          () => analyzeSimPhongThuy(r.rawText, customer.phoneNumber as string, customer, r.screenshotPng),
+          { heartbeatMs: HEARTBEAT_MS, summarize: summarizeAnalysis },
+        );
       }
       throw new Error(`Unhandled scraper result type: ${r.type}`);
     });
     const analyses = await Promise.all(analysisJobs);
+    console.log(`[${dbReading.id}] STEP 2 — analyse all — done (${analyses.length} result(s))`);
 
     // STEP 3: SYNTHESISE
-    console.log(`[${dbReading.id}] STEP 3 — synthesise`);
-    const { text: finalContent, usage: synthUsage } = await synthesize(analyses, customer);
+    const includeSynthesis = customer.includeSynthesis ?? true;
+    let finalContent: string | null = null;
+    let synthUsage = emptyUsage();
+    if (!includeSynthesis) {
+      console.log(
+        `[${dbReading.id}] STEP 3 — synthesise skipped by request — selected packages only`,
+      );
+    } else if (analyses.length === 1) {
+      const single = analyses[0];
+      finalContent = formatByType(single.type, single.analysis);
+      console.log(
+        `[${dbReading.id}] STEP 3 — synthesise skipped for single package ${single.type} — chars=${finalContent.length.toLocaleString('vi-VN')}`,
+      );
+    } else {
+      onProgress?.('synthesizing');
+      const synthProvider = providerForSection('synthesize');
+      const synthesized = await trackTask(
+        dbReading.id,
+        `STEP 3 — synthesise via ${synthProvider}`,
+        () => synthesize(analyses, customer),
+        {
+          heartbeatMs: HEARTBEAT_MS,
+          summarize: (result) =>
+            `chars=${result.text.length.toLocaleString('vi-VN')}, tokens in=${result.usage.input}, out=${result.usage.output}`,
+        },
+      );
+      finalContent = synthesized.text;
+      synthUsage = synthesized.usage;
+    }
 
     // Aggregate token usage
     let totalUsage = emptyUsage();
     for (const a of analyses) if (a.usage) totalUsage = addUsage(totalUsage, a.usage);
     totalUsage = addUsage(totalUsage, synthUsage);
     const cost = calcCost(totalUsage);
+    console.log(
+      `[${dbReading.id}] USAGE — total tokens in=${totalUsage.input}, out=${totalUsage.output}, cost=${cost.vnd.toLocaleString('vi-VN')} VND`,
+    );
 
     // Persist Analysis rows + save screenshots locally
-    const screenshotPaths: Partial<Record<PackageType, string>> = {};
+    console.log(`[${dbReading.id}] STEP 3.5 — persist analyses — start`);
     for (let i = 0; i < scraperResults.length; i++) {
       const sr = scraperResults[i];
       const ai = analyses[i];
@@ -197,7 +453,6 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
           const saved = saveScreenshot(dbReading.id, sr.type, sr.screenshotPng);
           screenshotUrl = saved.url;
           screenshotPath = saved.filePath;
-          screenshotPaths[sr.type] = saved.filePath;
         } catch (e) {
           console.error(`[${dbReading.id}] save screenshot ${sr.type} failed:`, e);
         }
@@ -216,28 +471,9 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
           screenshotPath,
         },
       });
+      console.log(`[${dbReading.id}] STEP 3.5 — persist ${sr.type} — done`);
     }
-
-    // STEP 4: EXPORT .xlsx
-    console.log(`[${dbReading.id}] STEP 4 — export xlsx`);
-    let xlsxUrl: string | undefined;
-    let xlsxFileName: string | undefined;
-    try {
-      const exported = await generateXlsx({
-        readingId: dbReading.id,
-        customer,
-        analyses,
-        finalContent,
-        cost,
-        screenshotPaths,
-        provider: currentProvider(),
-        createdAt: dbReading.createdAt,
-      });
-      xlsxUrl = exported.url;
-      xlsxFileName = exported.fileName;
-    } catch (err) {
-      console.error(`[${dbReading.id}] xlsx export failed (continuing):`, err);
-    }
+    console.log(`[${dbReading.id}] STEP 3.5 — persist analyses — done`);
 
     // Finalise reading
     await prisma.reading.update({
@@ -253,10 +489,11 @@ export async function runReading(customer: CustomerInfo): Promise<RunResult> {
       },
     });
 
-    return { success: true, readingId: dbReading.id, xlsxUrl, xlsxFileName, cost };
+    console.log(`[${dbReading.id}] RUN — done`);
+    return { success: true, readingId: dbReading.id, cost };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[${dbReading.id}] ERROR`, message);
+    console.error(`[${dbReading.id}] RUN — error:`, message);
     await prisma.reading.update({
       where: { id: dbReading.id },
       data: { status: 'error', errorMessage: message, finishedAt: new Date() },

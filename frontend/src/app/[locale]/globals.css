@@ -16,7 +16,7 @@
   body {
     @apply bg-background text-text-primary antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    letter-spacing: -0.005em;
+    letter-spacing: 0;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -24,8 +24,8 @@
   }
 
   ::selection {
-    background: rgba(91, 108, 255, 0.18);
-    color: #1A1F36;
+    background: rgba(29, 77, 63, 0.15);
+    color: #1D4D3F;
   }
 }
 
@@ -39,12 +39,10 @@
   }
 
   .svc-panel {
-    background-image: linear-gradient(135deg, #4F46E5 0%, #6366F1 55%, #7C66FF 100%);
-    @apply text-white border border-white/10 shadow-elevated;
+    @apply border border-border bg-background-surface text-text-primary shadow-soft;
   }
 
   .btn-primary-grad {
-    background-image: linear-gradient(95deg, #5B6CFF 0%, #7C66FF 60%, #A855F7 100%);
-    @apply text-white shadow-soft;
+    @apply bg-accent-primary text-white shadow-soft;
   }
 }

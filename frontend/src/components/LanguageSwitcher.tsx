@@ -30,8 +30,12 @@ export function LanguageSwitcher() {
       setOpen(false);
       return;
     }
-    // Replace the leading /{locale} segment with the new locale.
-    const next = pathname.replace(/^\/(vi|en)/, `/${target}`) || `/${target}`;
+    const pathnameWithoutLocale =
+      pathname.replace(/^\/(vi|en)(?=\/|$)/, '') || '/';
+    // Use an explicit locale so middleware updates its cookie before normalizing `/vi` to `/`.
+    const next = `/${target}${
+      pathnameWithoutLocale === '/' ? '' : pathnameWithoutLocale
+    }`;
     router.replace(next);
     setOpen(false);
   };
@@ -45,7 +49,7 @@ export function LanguageSwitcher() {
         aria-expanded={open}
         className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
       >
-        <Globe size={14} className="text-[#3B82F6]" />
+        <Globe size={14} className="text-[#1D4D3F]" />
         <span>{locale === 'vi' ? t('vi') : t('en')}</span>
         <ChevronDown size={12} className="text-gray-400 transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
       </button>
@@ -61,13 +65,13 @@ export function LanguageSwitcher() {
                 onClick={() => switchTo(l)}
                 className={`flex w-full items-center justify-between px-4 py-3 text-xs font-medium transition-colors duration-150 hover:bg-gray-50 ${
                   l === locale
-                    ? 'text-[#3B82F6] bg-[#EFF6FF] font-semibold'
+                    ? 'text-[#1D4D3F] bg-[#EEF5F1] font-semibold'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <span>{l === 'vi' ? t('vi') : t('en')}</span>
                 {l === locale && (
-                  <span className="text-[9px] uppercase tracking-wider text-[#3B82F6]/80 font-bold bg-[#EFF6FF] px-1.5 py-0.5 rounded">
+                  <span className="text-[9px] text-[#1D4D3F]/80 font-semibold bg-[#EEF5F1] px-1.5 py-0.5 rounded">
                     {l}
                   </span>
                 )}

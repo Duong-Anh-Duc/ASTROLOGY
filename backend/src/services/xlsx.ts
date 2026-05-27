@@ -8,7 +8,7 @@ import { UPLOADS_PATH } from './storage';
 const EXPORTS_DIR = path.join(UPLOADS_PATH, 'exports');
 if (!fs.existsSync(EXPORTS_DIR)) fs.mkdirSync(EXPORTS_DIR, { recursive: true });
 
-const PACKAGE_LABELS: Record<PackageType, string> = {
+export const PACKAGE_LABELS: Record<PackageType, string> = {
   tuTru: 'Bát Tự',
   maiHoa: 'Kinh Dịch',
   sim: 'Sim Phong Thuỷ',
@@ -23,6 +23,110 @@ const SOURCE_URLS: Record<PackageType, string> = {
 function bullet(list: unknown): string {
   if (!Array.isArray(list)) return '';
   return list.map((x) => (typeof x === 'string' ? `• ${x}` : '')).filter(Boolean).join('\n');
+}
+
+function titleFromKey(key: string): string {
+  const labels: Record<string, string> = {
+    opening: 'Lời mở đầu',
+    banMenhNguHanh: 'Bản mệnh và ngũ hành',
+    ban_menh_ngu_hanh: 'Bản mệnh và ngũ hành',
+    tenGoiBiDanh: 'Tên gọi và bí danh',
+    ten_goi_bi_danh: 'Tên gọi và bí danh',
+    ungDungPhongThuy: 'Ứng dụng phong thủy',
+    ung_dung_phong_thuy: 'Ứng dụng phong thủy',
+    daiVanNamHienTai: 'Đại vận và năm hiện tại',
+    dai_van_nam_hien_tai: 'Đại vận và năm hiện tại',
+    loiKhuyen: 'Lời khuyên chân thành',
+    loi_khuyen: 'Lời khuyên chân thành',
+    loiKet: 'Lời kết',
+    loi_ket: 'Lời kết',
+    analysis: 'Phân tích',
+    report: 'Phân tích',
+    content: 'Phân tích',
+    text: 'Phân tích',
+  };
+  if (labels[key]) return labels[key];
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-zà-ỹ])([A-ZÀ-Ỹ])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+const PROSE_KEY_ORDER = [
+  'opening',
+  'loiMoDau',
+  'loi_mo_dau',
+  'banMenhNguHanh',
+  'ban_menh_ngu_hanh',
+  'tenGoiBiDanh',
+  'ten_goi_bi_danh',
+  'ungDungPhongThuy',
+  'ung_dung_phong_thuy',
+  'daiVanNamHienTai',
+  'dai_van_nam_hien_tai',
+  'loiKhuyen',
+  'loi_khuyen',
+  'loiKet',
+  'loi_ket',
+];
+
+function sortAnalysisKeys(keys: string[]): string[] {
+  return [...keys].sort((a, b) => {
+    const ai = PROSE_KEY_ORDER.indexOf(a);
+    const bi = PROSE_KEY_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
+function stringifyAnalysisValue(value: unknown, depth = 0): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (!value) return '';
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        const text = stringifyAnalysisValue(item, depth + 1);
+        return text ? `• ${text}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    const keys = Object.keys(object);
+    if (keys.length === 1) {
+      const onlyKey = keys[0];
+      if (
+        onlyKey === '$PARAMETER_NAME' ||
+        onlyKey === 'analysis' ||
+        onlyKey === 'report' ||
+        onlyKey === 'result' ||
+        onlyKey === 'tuTru'
+      ) {
+        return stringifyAnalysisValue(object[onlyKey], depth);
+      }
+    }
+
+    return sortAnalysisKeys(keys)
+      .map((key) => {
+        const text = stringifyAnalysisValue(object[key], depth + 1);
+        if (!text) return '';
+        return depth === 0 ? `═══ ${titleFromKey(key).toUpperCase()} ═══\n${text}` : text;
+      })
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  return '';
+}
+
+function fallbackFormatAnalysis(a: Record<string, unknown>): string {
+  return stringifyAnalysisValue(a).trim();
 }
 
 function formatTuTru(a: Record<string, unknown>): string {
@@ -86,13 +190,13 @@ function formatSim(a: Record<string, unknown>): string {
   return lines.join('\n');
 }
 
-function formatByType(type: PackageType, a: Record<string, unknown>): string {
-  if (type === 'tuTru') return formatTuTru(a);
-  if (type === 'maiHoa') return formatMaiHoa(a);
-  return formatSim(a);
+export function formatByType(type: PackageType, a: Record<string, unknown>): string {
+  const formatted =
+    type === 'tuTru' ? formatTuTru(a) : type === 'maiHoa' ? formatMaiHoa(a) : formatSim(a);
+  return formatted.trim() || fallbackFormatAnalysis(a);
 }
 
-function markdownToPlainText(md: string): string {
+export function markdownToPlainText(md: string): string {
   let s = md.replace(/\r\n/g, '\n');
   s = s.replace(/^######\s+(.*)$/gm, (_, t) => t.toUpperCase());
   s = s.replace(/^#####\s+(.*)$/gm, (_, t) => t.toUpperCase());
@@ -200,7 +304,7 @@ export async function generateXlsx(input: GenerateXlsxInput): Promise<GenerateXl
   synthHeader.font = { bold: true, size: 13, color: { argb: 'FFC9A66B' } };
   synthHeader.height = 24;
 
-  const synthRow = info.addRow(['', markdownToPlainText(finalContent || '')]);
+  const synthRow = info.addRow([markdownToPlainText(finalContent || '')]);
   info.mergeCells(`A${synthRow.number}:B${synthRow.number}`);
   synthRow.getCell(1).alignment = { vertical: 'top', wrapText: true };
   // Generous synthesis row height — Excel will still respect wrapping
@@ -244,7 +348,7 @@ export async function generateXlsx(input: GenerateXlsxInput): Promise<GenerateXl
     analysisHeader.height = 22;
 
     const formatted = formatByType(a.type, a.analysis);
-    const analysisRow = ws.addRow(['', formatted]);
+    const analysisRow = ws.addRow([formatted]);
     ws.mergeCells(`A${analysisRow.number}:B${analysisRow.number}`);
     analysisRow.getCell(1).alignment = { vertical: 'top', wrapText: true };
     analysisRow.height = 320;
