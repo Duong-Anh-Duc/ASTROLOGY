@@ -11,6 +11,7 @@ import {
   Compass,
   Scroll,
   Clock,
+  X,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
@@ -33,20 +34,29 @@ interface StatusPanelProps {
   xlsxFileName?: string;
   cost?: CostInfo;
   errorMessage?: string;
+  onMinimize?: () => void;
   onRetry: () => void;
   onReset: () => void;
 }
-
-const STEPS: Exclude<ProcessingStep, 'idle' | 'done' | 'error'>[] = [
-  'scraping',
-  'analyzing',
-  'synthesizing',
-];
 
 const PACKAGE_LABELS: Record<PackageType, string> = {
   tuTru: 'Bát tự',
   maiHoa: 'Kinh dịch',
   sim: 'Sim phong thủy',
+};
+
+type Phase = 'scraping' | 'analyzing' | 'synthesizing';
+
+interface VisibleStep {
+  key: string;
+  phase: Phase;
+  label: string;
+}
+
+const PHASE_ORDER: Record<Phase, number> = {
+  scraping: 0,
+  analyzing: 1,
+  synthesizing: 2,
 };
 
 export function StatusPanel({
@@ -58,6 +68,7 @@ export function StatusPanel({
   xlsxFileName,
   cost,
   errorMessage,
+  onMinimize,
   onRetry,
   onReset,
 }: StatusPanelProps) {
@@ -184,13 +195,34 @@ export function StatusPanel({
     );
   }
 
-  const visibleSteps = STEPS.filter(
-    (s) => s !== 'synthesizing' || (includeSynthesis && packages.length > 1),
-  );
-  const currentIndex = visibleSteps.indexOf(
-    step as (typeof STEPS)[number],
-  );
-  const selectedPackageText = packages.map((pkg) => PACKAGE_LABELS[pkg]).join(', ');
+  const selectedPackages: PackageType[] = packages.length > 0 ? packages : ['tuTru'];
+  const visibleSteps: VisibleStep[] = [
+    ...selectedPackages.map((pkg) => ({
+      key: `scraping-${pkg}`,
+      phase: 'scraping' as const,
+      label: t('scrapingPackage', { package: PACKAGE_LABELS[pkg] }),
+    })),
+    ...selectedPackages.map((pkg) => ({
+      key: `analyzing-${pkg}`,
+      phase: 'analyzing' as const,
+      label: t('analyzingPackage', { package: PACKAGE_LABELS[pkg] }),
+    })),
+    ...(includeSynthesis && selectedPackages.length > 1
+      ? [
+          {
+            key: 'synthesizing',
+            phase: 'synthesizing' as const,
+            label: t('synthesizingSelected'),
+          },
+        ]
+      : []),
+  ];
+  const currentPhase = step === 'synthesizing'
+    ? 'synthesizing'
+    : step === 'analyzing'
+      ? 'analyzing'
+      : 'scraping';
+  const currentOrder = PHASE_ORDER[currentPhase];
 
   return (
     <div className="bg-white relative flex flex-col gap-6 rounded-xl p-6 shadow-2xl border border-gray-200 sm:p-8 overflow-hidden">
@@ -204,19 +236,32 @@ export function StatusPanel({
             {t('readingFor')} <span className="text-text-secondary font-semibold">{customerName}</span>
           </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-[#1D4D3F]/20 bg-[#EEF5F1] px-3 py-1 text-[10px] font-semibold text-[#1D4D3F]">
-          <Clock size={10} className="text-[#1D4D3F]" />
-          <span>{Math.floor(elapsed / 60)}m {elapsed % 60}s</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full border border-[#1D4D3F]/20 bg-[#EEF5F1] px-3 py-1 text-[10px] font-semibold text-[#1D4D3F]">
+            <Clock size={10} className="text-[#1D4D3F]" />
+            <span>{Math.floor(elapsed / 60)}m {elapsed % 60}s</span>
+          </div>
+          {onMinimize && (
+            <button
+              type="button"
+              onClick={onMinimize}
+              aria-label={t('hideProgress')}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-tertiary transition-colors hover:bg-gray-100 hover:text-text-primary"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 
       <ul className="flex flex-col gap-3.5 relative z-10">
-        {visibleSteps.map((s, i) => {
-          const done = i < currentIndex;
-          const active = i === currentIndex;
+        {visibleSteps.map((s) => {
+          const order = PHASE_ORDER[s.phase];
+          const done = order < currentOrder;
+          const active = order === currentOrder;
           return (
             <li
-              key={s}
+              key={s.key}
               className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3.5 transition-all duration-300 ${
                 active
                   ? 'border-[#1D4D3F] bg-[#EEF5F1] text-[#1D4D3F]'
@@ -242,11 +287,11 @@ export function StatusPanel({
                       active ? 'text-[#1D4D3F] font-semibold' : ''
                     }`}
                   >
-                    {t(s)}
+                    {s.label}
                   </span>
-                  {selectedPackageText && s !== 'synthesizing' && (
+                  {s.phase === 'synthesizing' && (
                     <span className="truncate text-xs text-text-tertiary">
-                      {selectedPackageText}
+                      {t('synthesizingHint')}
                     </span>
                   )}
                 </span>

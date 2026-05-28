@@ -1,6 +1,6 @@
 'use client';
 
-import { Library, Sparkles } from 'lucide-react';
+import { ChevronUp, Clock, Library, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { DivinationForm } from '../../components/DivinationForm';
@@ -31,11 +31,14 @@ type RunStreamEvent =
 export default function HomePage() {
   const tCommon = useTranslations('common');
   const tErrors = useTranslations('errors');
+  const tStatus = useTranslations('status');
 
   const [state, setState] = useState<RunState>({ kind: 'idle' });
+  const [isProgressOpen, setIsProgressOpen] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const startRun = async (data: CustomerInfo) => {
+    setIsProgressOpen(true);
     setState({ kind: 'running', step: 'scraping', customer: data });
 
     try {
@@ -181,17 +184,30 @@ export default function HomePage() {
 
       <HistoryTable refreshSignal={historyRefresh} />
 
-      {state.kind === 'running' && (
+      {state.kind === 'running' && isProgressOpen && (
         <div className="fixed bottom-4 right-4 z-40 w-[calc(100vw-2rem)] max-w-[430px] sm:bottom-6 sm:right-6">
           <StatusPanel
             step={state.step}
             customerName={state.customer.fullName}
             packages={state.customer.packages}
             includeSynthesis={state.customer.includeSynthesis}
+            onMinimize={() => setIsProgressOpen(false)}
             onRetry={() => startRun(state.customer)}
             onReset={dismiss}
           />
         </div>
+      )}
+
+      {state.kind === 'running' && !isProgressOpen && (
+        <button
+          type="button"
+          onClick={() => setIsProgressOpen(true)}
+          className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border border-[#1D4D3F]/20 bg-white px-4 py-3 text-sm font-semibold text-[#1D4D3F] shadow-xl transition-colors hover:bg-[#EEF5F1] sm:bottom-6 sm:right-6"
+        >
+          <Clock size={15} />
+          <span>{tStatus('showProgress')}</span>
+          <ChevronUp size={15} />
+        </button>
       )}
 
       {showDialog && (
