@@ -186,6 +186,8 @@ export default function HomePage() {
           <StatusPanel
             step={state.step}
             customerName={state.customer.fullName}
+            packages={state.customer.packages}
+            includeSynthesis={state.customer.includeSynthesis}
             onRetry={() => startRun(state.customer)}
             onReset={dismiss}
           />

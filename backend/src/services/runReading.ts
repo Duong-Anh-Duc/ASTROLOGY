@@ -402,7 +402,7 @@ export async function runReading(
     console.log(`[${dbReading.id}] STEP 2 — analyse all — done (${analyses.length} result(s))`);
 
     // STEP 3: SYNTHESISE
-    const includeSynthesis = customer.includeSynthesis ?? true;
+    const includeSynthesis = customer.includeSynthesis === true && analyses.length > 1;
     let finalContent: string | null = null;
     let synthUsage = emptyUsage();
     if (!includeSynthesis) {

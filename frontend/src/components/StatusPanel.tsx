@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
-import type { ProcessingStep } from '../types';
+import type { PackageType, ProcessingStep } from '../types';
 import { Button } from './ui/Button';
 
 interface CostInfo {
@@ -27,6 +27,8 @@ interface CostInfo {
 interface StatusPanelProps {
   step: ProcessingStep;
   customerName: string;
+  packages?: PackageType[];
+  includeSynthesis?: boolean;
   xlsxUrl?: string;
   xlsxFileName?: string;
   cost?: CostInfo;
@@ -41,9 +43,17 @@ const STEPS: Exclude<ProcessingStep, 'idle' | 'done' | 'error'>[] = [
   'synthesizing',
 ];
 
+const PACKAGE_LABELS: Record<PackageType, string> = {
+  tuTru: 'Bát tự',
+  maiHoa: 'Kinh dịch',
+  sim: 'Sim phong thủy',
+};
+
 export function StatusPanel({
   step,
   customerName,
+  packages = [],
+  includeSynthesis = false,
   xlsxUrl,
   xlsxFileName,
   cost,
@@ -174,9 +184,13 @@ export function StatusPanel({
     );
   }
 
-  const currentIndex = STEPS.indexOf(
+  const visibleSteps = STEPS.filter(
+    (s) => s !== 'synthesizing' || (includeSynthesis && packages.length > 1),
+  );
+  const currentIndex = visibleSteps.indexOf(
     step as (typeof STEPS)[number],
   );
+  const selectedPackageText = packages.map((pkg) => PACKAGE_LABELS[pkg]).join(', ');
 
   return (
     <div className="bg-white relative flex flex-col gap-6 rounded-xl p-6 shadow-2xl border border-gray-200 sm:p-8 overflow-hidden">
@@ -197,7 +211,7 @@ export function StatusPanel({
       </div>
 
       <ul className="flex flex-col gap-3.5 relative z-10">
-        {STEPS.map((s, i) => {
+        {visibleSteps.map((s, i) => {
           const done = i < currentIndex;
           const active = i === currentIndex;
           return (
@@ -222,12 +236,19 @@ export function StatusPanel({
                 ) : (
                   <Circle size={18} className="text-text-tertiary shrink-0" />
                 )}
-                <span
-                  className={`text-sm font-medium ${
-                    active ? 'text-[#1D4D3F] font-semibold' : ''
-                  }`}
-                >
-                  {t(s)}
+                <span className="flex min-w-0 flex-col">
+                  <span
+                    className={`text-sm font-medium ${
+                      active ? 'text-[#1D4D3F] font-semibold' : ''
+                    }`}
+                  >
+                    {t(s)}
+                  </span>
+                  {selectedPackageText && s !== 'synthesizing' && (
+                    <span className="truncate text-xs text-text-tertiary">
+                      {selectedPackageText}
+                    </span>
+                  )}
                 </span>
               </div>
               
