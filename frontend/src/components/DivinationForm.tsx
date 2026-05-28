@@ -34,16 +34,10 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const [question, setQuestion] = useState('');
   const [addressing, setAddressing] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
-  const [includeSynthesis, setIncludeSynthesis] = useState(true);
+  const [includeSynthesis, setIncludeSynthesis] = useState(false);
   const [useSolarTerms, setUseSolarTerms] = useState(false);
   const [packages, setPackages] = useState<PackageType[]>(['tuTru', 'maiHoa', 'sim']);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const isCombinedActive =
-    packages.includes('tuTru') &&
-    packages.includes('maiHoa') &&
-    packages.includes('sim') &&
-    includeSynthesis;
 
   const clearError = (field: string) => {
     setErrors((prev) => {
@@ -62,19 +56,9 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
 
       if (next.length > 0) clearError('packages');
       if (!next.includes('sim')) clearError('phoneNumber');
+      if (next.length < 2) setIncludeSynthesis(false);
       return next;
     });
-  };
-
-  const toggleCombined = () => {
-    if (isCombinedActive) {
-      setPackages([]);
-      setIncludeSynthesis(false);
-    } else {
-      setPackages(['tuTru', 'maiHoa', 'sim']);
-      setIncludeSynthesis(true);
-      clearError('packages');
-    }
   };
 
   const validate = (): boolean => {
@@ -99,10 +83,10 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
       }
     }
 
-    const hasPackages = packages.length > 0 || isCombinedActive;
+    const hasPackages = packages.length > 0;
     if (!hasPackages) next.packages = t('validation.packageRequired');
 
-    const needsPhone = packages.includes('sim') || isCombinedActive;
+    const needsPhone = packages.includes('sim');
     if (needsPhone && !phoneNumber.trim()) {
       next.phoneNumber = t('validation.phoneRequired');
     }
@@ -124,12 +108,12 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
       minute: minuteNum,
       isLunar,
       gender: gender === 'other' ? 'male' : gender, // Map 'other' to 'male' for backend compatibility
-      packages: isCombinedActive ? ['tuTru', 'maiHoa', 'sim'] : packages,
-      phoneNumber: (packages.includes('sim') || isCombinedActive) ? phoneNumber.trim() : undefined,
+      packages,
+      phoneNumber: packages.includes('sim') ? phoneNumber.trim() : undefined,
       question: question.trim() ? question.trim() : undefined,
       addressing: addressing.trim() ? addressing.trim() : undefined,
       additionalContext: additionalContext.trim() ? additionalContext.trim() : undefined,
-      includeSynthesis: includeSynthesis || isCombinedActive,
+      includeSynthesis: packages.length > 1 && includeSynthesis,
       useSolarTerms: useSolarTerms,
     });
   };
@@ -137,7 +121,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const cellCls =
     'h-11 w-full rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-sm text-[#1A1F36] placeholder:text-[#98A2B3] transition-all duration-200 focus:border-[#1D4D3F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1D4D3F]/5';
   const errCls = 'border-semantic-error/60 focus:ring-semantic-error/20 focus:border-semantic-error';
-  const needsPhone = packages.includes('sim') || isCombinedActive;
+  const needsPhone = packages.includes('sim');
+  const canSynthesize = packages.length > 1;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -163,14 +148,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#EEF5F1] text-[#1D4D3F]">
                     <User size={12} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#667085]">
+                  <span className="text-sm font-semibold text-[#475467]">
                     Hồ sơ cơ bản
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       {t('customerName')}
                     </label>
                     <div className="relative">
@@ -192,7 +177,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       {t('addressingLabel')}
                     </label>
                     <div className="relative">
@@ -201,16 +186,15 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                         onChange={(e) => setAddressing(e.target.value)}
                         placeholder={t('addressingPlaceholder')}
                         autoComplete="off"
-                        className={`${cellCls} pr-10`}
+                        className={cellCls}
                       />
-                      <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#98A2B3] pointer-events-none" />
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-1">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       {t('birthDate')}
                     </label>
                     <ConfigProvider
@@ -261,7 +245,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       Giờ sinh <span className="text-[10px] text-[#8A93A6] font-normal">({t('birthHourHint').toLowerCase()})</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
@@ -297,14 +281,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-1">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       {t('gender')}
                     </label>
                     <div className="flex rounded-lg border border-[#E5E7EB] overflow-hidden h-11 bg-white">
                       <button
                         type="button"
                         onClick={() => setGender('male')}
-                        className={`flex-1 flex items-center justify-center text-xs font-semibold border-0 cursor-pointer transition-all ${
+                        className={`flex-1 flex items-center justify-center text-sm font-semibold border-0 cursor-pointer transition-all ${
                           gender === 'male'
                             ? 'bg-[#1D4D3F] text-white'
                             : 'bg-white text-[#475467] hover:bg-gray-50'
@@ -316,7 +300,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                       <button
                         type="button"
                         onClick={() => setGender('female')}
-                        className={`flex-1 flex items-center justify-center text-xs font-semibold border-0 cursor-pointer transition-all ${
+                        className={`flex-1 flex items-center justify-center text-sm font-semibold border-0 cursor-pointer transition-all ${
                           gender === 'female'
                             ? 'bg-[#1D4D3F] text-white'
                             : 'bg-white text-[#475467] hover:bg-gray-50'
@@ -328,7 +312,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                       <button
                         type="button"
                         onClick={() => setGender('other')}
-                        className={`flex-1 flex items-center justify-center text-xs font-semibold border-0 cursor-pointer transition-all ${
+                        className={`flex-1 flex items-center justify-center text-sm font-semibold border-0 cursor-pointer transition-all ${
                           gender === 'other'
                             ? 'bg-[#1D4D3F] text-white'
                             : 'bg-white text-[#475467] hover:bg-gray-50'
@@ -340,14 +324,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#475467]">
+                    <label className="text-sm font-semibold text-[#475467]">
                       {t('calendarType')}
                     </label>
                     <div className="flex rounded-lg border border-[#E5E7EB] overflow-hidden h-11 bg-white">
                       <button
                         type="button"
                         onClick={() => setIsLunar(false)}
-                        className={`flex-1 flex items-center justify-center text-xs font-semibold border-0 cursor-pointer transition-all px-4 ${
+                        className={`flex-1 flex items-center justify-center text-sm font-semibold border-0 cursor-pointer transition-all px-4 ${
                           !isLunar
                             ? 'bg-[#1D4D3F] text-white'
                             : 'bg-white text-[#475467] hover:bg-gray-50'
@@ -359,7 +343,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                       <button
                         type="button"
                         onClick={() => setIsLunar(true)}
-                        className={`flex-1 flex items-center justify-center text-xs font-semibold border-0 cursor-pointer transition-all px-4 ${
+                        className={`flex-1 flex items-center justify-center text-sm font-semibold border-0 cursor-pointer transition-all px-4 ${
                           isLunar
                             ? 'bg-[#1D4D3F] text-white'
                             : 'bg-white text-[#475467] hover:bg-gray-50'
@@ -378,13 +362,13 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#EEF5F1] text-[#1D4D3F]">
                     <MessageSquareText size={12} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#667085]">
+                  <span className="text-sm font-semibold text-[#475467]">
                     Nội dung cần xem
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#475467]">
+                  <label className="text-sm font-semibold text-[#475467]">
                     {t('questionLabel')}
                   </label>
                   <div className="relative">
@@ -408,7 +392,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#475467]">
+                  <label className="text-sm font-semibold text-[#475467]">
                     {t('additionalContextLabel')}
                   </label>
                   <textarea
@@ -453,7 +437,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
               <h2 className="text-lg font-bold text-[#1A1F36]">
                 {t('servicePackages')}
               </h2>
-              <span className="text-[11px] text-[#667085] font-medium mt-1.5">
+              <span className="text-sm text-[#667085] font-medium mt-1.5">
                 Chọn các gói phù hợp với nhu cầu của bạn.
               </span>
             </div>
@@ -465,10 +449,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 type="button"
                 onClick={() => togglePackage('tuTru')}
                 className={`flex items-center gap-4 rounded-xl border p-4 text-left transition-all hover:bg-[#FAF9F6] shadow-[0_2px_8px_rgba(0,0,0,0.01)] border-0 cursor-pointer ${
-                  packages.includes('tuTru') && !isCombinedActive
+                  packages.includes('tuTru')
                     ? 'border border-[#1D4D3F] bg-[#FAFBFB]'
-                    : isCombinedActive
-                    ? 'border border-[#E5E7EB] bg-[#FAFBFB] opacity-75'
                     : 'border border-[#E5E7EB] bg-white'
                 }`}
               >
@@ -476,7 +458,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <Sparkles size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <span className="text-sm font-bold text-[#1A1F36]">
+                  <span className="text-base font-bold text-[#1A1F36]">
                     {t('packageTuTru')}
                   </span>
                   <span className="text-xs text-[#667085] leading-relaxed">
@@ -485,7 +467,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 </div>
                 <div className="flex items-center justify-center shrink-0 ml-2">
                   <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
-                    packages.includes('tuTru') || isCombinedActive
+                    packages.includes('tuTru')
                       ? 'border-[#1D4D3F] bg-[#1D4D3F] text-white'
                       : 'border-gray-300 bg-white text-transparent'
                   }`}>
@@ -499,10 +481,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 type="button"
                 onClick={() => togglePackage('maiHoa')}
                 className={`flex items-center gap-4 rounded-xl border p-4 text-left transition-all hover:bg-[#FAF9F6] shadow-[0_2px_8px_rgba(0,0,0,0.01)] border-0 cursor-pointer ${
-                  packages.includes('maiHoa') && !isCombinedActive
+                  packages.includes('maiHoa')
                     ? 'border border-[#1D4D3F] bg-[#FAFBFB]'
-                    : isCombinedActive
-                    ? 'border border-[#E5E7EB] bg-[#FAFBFB] opacity-75'
                     : 'border border-[#E5E7EB] bg-white'
                 }`}
               >
@@ -510,7 +490,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <BookOpen size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <span className="text-sm font-bold text-[#1A1F36]">
+                  <span className="text-base font-bold text-[#1A1F36]">
                     {t('packageMaiHoa')}
                   </span>
                   <span className="text-xs text-[#667085] leading-relaxed">
@@ -519,7 +499,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 </div>
                 <div className="flex items-center justify-center shrink-0 ml-2">
                   <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
-                    packages.includes('maiHoa') || isCombinedActive
+                    packages.includes('maiHoa')
                       ? 'border-[#1D4D3F] bg-[#1D4D3F] text-white'
                       : 'border-gray-300 bg-white text-transparent'
                   }`}>
@@ -533,10 +513,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 type="button"
                 onClick={() => togglePackage('sim')}
                 className={`flex items-center gap-4 rounded-xl border p-4 text-left transition-all hover:bg-[#FAF9F6] shadow-[0_2px_8px_rgba(0,0,0,0.01)] border-0 cursor-pointer ${
-                  packages.includes('sim') && !isCombinedActive
+                  packages.includes('sim')
                     ? 'border border-[#1D4D3F] bg-[#FAFBFB]'
-                    : isCombinedActive
-                    ? 'border border-[#E5E7EB] bg-[#FAFBFB] opacity-75'
                     : 'border border-[#E5E7EB] bg-white'
                 }`}
               >
@@ -544,7 +522,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <Compass size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <span className="text-sm font-bold text-[#1A1F36]">
+                  <span className="text-base font-bold text-[#1A1F36]">
                     {t('packageSim')}
                   </span>
                   <span className="text-xs text-[#667085] leading-relaxed">
@@ -553,7 +531,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 </div>
                 <div className="flex items-center justify-center shrink-0 ml-2">
                   <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
-                    packages.includes('sim') || isCombinedActive
+                    packages.includes('sim')
                       ? 'border-[#1D4D3F] bg-[#1D4D3F] text-white'
                       : 'border-gray-300 bg-white text-transparent'
                   }`}>
@@ -562,72 +540,45 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 </div>
               </button>
 
-              {/* Package 4: Tổng hợp chuyên sâu */}
-              <button
-                type="button"
-                onClick={toggleCombined}
-                className={`flex items-center gap-4 rounded-xl border p-4 text-left transition-all hover:bg-[#FAF9F6] shadow-[0_2px_8px_rgba(0,0,0,0.01)] border-0 cursor-pointer ${
-                  isCombinedActive
-                    ? 'border border-[#1D4D3F] bg-[#FAFBFB]'
-                    : 'border border-[#E5E7EB] bg-white'
-                }`}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#EEF5F1] text-[#1D4D3F]">
-                  <Phone size={18} strokeWidth={2.5} />
-                </div>
-                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <span className="text-sm font-bold text-[#1A1F36]">
-                    Tổng hợp chuyên sâu
-                  </span>
-                  <span className="text-xs text-[#667085] leading-relaxed">
-                    Báo cáo đầy đủ từ các gói đã chọn
-                  </span>
-                </div>
-                <div className="flex items-center justify-center shrink-0 ml-2">
-                  <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
-                    isCombinedActive
-                      ? 'border-[#1D4D3F] bg-[#1D4D3F] text-white'
-                      : 'border-gray-300 bg-white text-transparent'
-                  }`}>
-                    <Check size={12} strokeWidth={3} />
-                  </div>
-                </div>
-              </button>
             </div>
 
             {errors.packages && (
               <span className="text-[11px] text-semantic-error font-medium">{errors.packages}</span>
             )}
 
-            {/* Tạo tab Tổng hợp Switch Card */}
             <button
               type="button"
+              disabled={!canSynthesize}
               onClick={() => setIncludeSynthesis((prev) => !prev)}
-              className={`flex w-full items-start gap-4 rounded-xl border px-4 py-3.5 text-left transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] border-0 cursor-pointer ${
-                includeSynthesis
-                  ? 'bg-[#EEF5F1] border-[#D3E7DA]'
-                  : 'bg-white border-[#E5E7EB]'
+              className={`flex w-full items-start gap-4 rounded-xl border px-4 py-3.5 text-left transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${
+                !canSynthesize
+                  ? 'cursor-not-allowed border-[#E5E7EB] bg-[#F7F8FA] opacity-60'
+                  : includeSynthesis
+                    ? 'cursor-pointer border-[#D3E7DA] bg-[#EEF5F1]'
+                    : 'cursor-pointer border-[#E5E7EB] bg-white hover:bg-[#FAF9F6]'
               }`}
             >
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                includeSynthesis ? 'bg-[#1D4D3F] text-white' : 'bg-[#F2F4F7] text-[#667085]'
+                includeSynthesis && canSynthesize
+                  ? 'bg-[#1D4D3F] text-white'
+                  : 'bg-[#F2F4F7] text-[#667085]'
               }`}>
                 <Check size={16} strokeWidth={2.5} />
               </div>
               <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                <span className="text-sm font-bold text-[#1A1F36]">
+                <span className="text-base font-bold text-[#1A1F36]">
                   {t('includeSynthesisLabel')}
                 </span>
                 <span className="text-xs leading-relaxed text-[#525866]">
-                  Bật để AI viết phần tổng hợp chung, tiết kiệm thời gian.
+                  {t('includeSynthesisHint')}
                 </span>
               </div>
               <div className="flex items-center justify-center shrink-0 ml-2 mt-1">
-                <div className={`relative h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none ${
-                  includeSynthesis ? 'bg-[#1D4D3F]' : 'bg-gray-200'
+                <div className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${
+                  includeSynthesis && canSynthesize ? 'bg-[#1D4D3F]' : 'bg-gray-200'
                 }`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out mt-1 ${
-                    includeSynthesis ? 'translate-x-6' : 'translate-x-1'
+                    includeSynthesis && canSynthesize ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </div>
               </div>

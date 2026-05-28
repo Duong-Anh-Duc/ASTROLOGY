@@ -23,9 +23,9 @@ interface SettingsView {
   anthropicKey: KeyInfo;
 }
 
-const PROVIDER_DEFS: { value: Provider; icon: typeof Sparkles; iconBg: string; iconText: string; tag: string }[] = [
-  { value: 'gemini', icon: Sparkles, iconBg: 'bg-[#EFF6FF]', iconText: 'text-[#3B82F6]', tag: 'Google' },
-  { value: 'claude', icon: Cpu, iconBg: 'bg-[#FFF7ED]', iconText: 'text-[#EA580C]', tag: 'Anthropic' },
+const PROVIDER_DEFS: { value: Provider; icon: typeof Sparkles; iconText: string }[] = [
+  { value: 'gemini', icon: Sparkles, iconText: 'text-[#3B82F6]' },
+  { value: 'claude', icon: Cpu, iconText: 'text-[#EA580C]' },
 ];
 
 function backendUrl(path: string): string {
@@ -37,7 +37,6 @@ export function ModelPanel() {
   const t = useTranslations('model');
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<SettingsView | null>(null);
-  const [provider, setProvider] = useState<Provider>('gemini');
   const [sectionProviders, setSectionProviders] = useState<Record<SectionKey, Provider>>({
     tuTru: 'gemini', maiHoa: 'gemini', sim: 'gemini', synthesize: 'gemini',
   });
@@ -65,7 +64,6 @@ export function ModelPanel() {
       const gk = keys.geminiApiKey ?? '';
       const ak = keys.anthropicApiKey ?? '';
       setView(body);
-      setProvider(body.provider);
       setSectionProviders(body.sectionProviders);
       setGeminiKeyDraft(gk);
       setGeminiKeyOriginal(gk);
@@ -86,8 +84,7 @@ export function ModelPanel() {
 
   const dirty =
     view !== null &&
-    (provider !== view.provider ||
-      SECTION_KEYS.some((k) => sectionProviders[k] !== view.sectionProviders[k]) ||
+    (SECTION_KEYS.some((k) => sectionProviders[k] !== view.sectionProviders[k]) ||
       geminiKeyDraft.trim() !== geminiKeyOriginal.trim() ||
       anthropicKeyDraft.trim() !== anthropicKeyOriginal.trim());
 
@@ -96,7 +93,10 @@ export function ModelPanel() {
     setStatus('idle');
     setErrorMsg('');
     try {
-      const payload: Record<string, unknown> = { provider, sectionProviders };
+      const payload: Record<string, unknown> = {
+        provider: sectionProviders.synthesize,
+        sectionProviders,
+      };
       if (geminiKeyDraft.trim().length > 0) payload.geminiApiKey = geminiKeyDraft.trim();
       if (anthropicKeyDraft.trim().length > 0) payload.anthropicApiKey = anthropicKeyDraft.trim();
       const res = await fetch(backendUrl('/api/settings'), {
@@ -110,7 +110,6 @@ export function ModelPanel() {
       }
       const body = (await res.json()) as SettingsView & { success: boolean };
       setView(body);
-      setProvider(body.provider);
       setSectionProviders(body.sectionProviders);
       setGeminiKeyOriginal(geminiKeyDraft.trim());
       setAnthropicKeyOriginal(anthropicKeyDraft.trim());
@@ -150,9 +149,6 @@ export function ModelPanel() {
     }
   };
 
-  const keyForProvider = (p: Provider): KeyInfo | null =>
-    p === 'gemini' ? view?.geminiKey ?? null : view?.anthropicKey ?? null;
-
   return (
     <>
       <button
@@ -162,9 +158,9 @@ export function ModelPanel() {
       >
         <Bot size={14} className="text-[#7C3AED]" />
         {t('openButton')}
-        {view && (
+        {view?.sectionProviders.synthesize && (
           <span className="ml-1 rounded-full bg-[#F5F3FF] px-2 py-0.5 text-[10px] font-bold text-[#7C3AED] capitalize">
-            {view.provider}
+            {view.sectionProviders.synthesize}
           </span>
         )}
       </button>
@@ -186,47 +182,6 @@ export function ModelPanel() {
             </div>
 
             <div className="flex flex-col gap-5 p-5">
-              {/* Provider picker */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-text-secondary">
-                  {t('providerLabel')}
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {PROVIDER_DEFS.map(({ value, icon: Icon, iconBg, iconText, tag }) => {
-                    const active = provider === value;
-                    const info = keyForProvider(value);
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setProvider(value)}
-                        className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
-                          active
-                            ? 'border-[#3B82F6] bg-[#EFF6FF] shadow-sm'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
-                      >
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconBg} ${iconText}`}>
-                          <Icon size={16} />
-                        </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="text-sm font-bold text-[#1A1F36] capitalize">{value}</span>
-                          <span className="text-[10px] text-text-tertiary">{tag}</span>
-                          <span className={`mt-1 text-[10px] font-semibold ${info?.present ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                            {info?.present ? t('keyPresent') : t('keyMissing')}
-                          </span>
-                        </div>
-                        {active && (
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#3B82F6] text-white">
-                            <Check size={12} />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Per-section model */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-text-secondary">

@@ -2,11 +2,12 @@ import Anthropic from '@anthropic-ai/sdk';
 type ContentBlockParam = Anthropic.TextBlockParam | Anthropic.ImageBlockParam;
 import { getPrompt } from '../lib/store';
 import { getAnthropicApiKey } from '../lib/settings';
+import { actualCustomerInstruction, customerBlock } from '../lib/customerContext';
 import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 
 export { DEFAULT_PROMPT_SYNTHESIZE as SYSTEM_PROMPT_SYNTHESIZE } from '../lib/defaults';
 
-const MODEL_NAME = 'claude-sonnet-4-5-20250929';
+const MODEL_NAME = 'claude-sonnet-4-6';
 const ANALYSIS_TIMEOUT_MS = Number(process.env.CLAUDE_ANALYSIS_TIMEOUT_MS ?? 10 * 60_000);
 const SYNTHESIS_TIMEOUT_MS = Number(process.env.CLAUDE_SYNTHESIS_TIMEOUT_MS ?? 10 * 60_000);
 const MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS ?? 8192);
@@ -18,28 +19,6 @@ function getClient(): Anthropic {
     throw new Error('Chưa cấu hình Anthropic API key — vào "Model AI" để nhập.');
   }
   return new Anthropic({ apiKey });
-}
-
-function customerBlock(customer: CustomerInfo): string {
-  return [
-    `- Họ tên: ${customer.fullName}`,
-    `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}`,
-    `- Giờ sinh: ${customer.hour === null ? 'Không rõ' : `${customer.hour}:${String(customer.minute ?? 0).padStart(2, '0')}`}`,
-    `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
-    customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
-    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
-    customer.question ? `- Việc cần xem: ${customer.question}` : '',
-    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-function actualCustomerInstruction(customer: CustomerInfo): string {
-  return `DỮ LIỆU THỰC TẾ CỦA LƯỢT LUẬN GIẢI NÀY:
-${customerBlock(customer)}
-
-Các tên, danh xưng, ví dụ hoặc tình tiết khách hàng có sẵn trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên. Luôn dùng dữ liệu thực tế này. Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
 }
 
 function promptRequiresJson(prompt: string): boolean {

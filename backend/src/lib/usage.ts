@@ -10,7 +10,7 @@ const USD_TO_VND = 25_000;
 // Approx pricing (USD per million tokens).
 const PRICING = {
   gemini: { input: 1.25, output: 5.0 }, // Gemini 3.1 Pro Preview
-  claude: { input: 3.0, output: 15.0 }, // Claude Sonnet 4.5
+  claude: { input: 3.0, output: 15.0 }, // Claude Sonnet 4.6
 };
 
 export function emptyUsage(): TokenUsage {

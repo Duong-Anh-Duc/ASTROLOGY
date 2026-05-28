@@ -130,7 +130,8 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
   useEffect(() => { void load(); }, [load, refreshSignal]);
   useEffect(() => { setPage(1); setSearchTerm(''); }, [refreshSignal]);
 
-  const colSpanCount = 9;
+  const colSpanCount = 10;
+  const rowNumber = (index: number) => (page - 1) * pageSize + index + 1;
 
   const handleCreateNew = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -220,8 +221,11 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEF5F1] text-[#1D4D3F] font-bold text-xs">
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEF5F1] text-[#1D4D3F] font-bold text-xs">
                       {getInitials(r.fullName)}
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-[#667085] shadow-sm ring-1 ring-[#E5E7EB]">
+                        {rowNumber(i)}
+                      </span>
                     </div>
                     <div className="flex flex-col leading-tight min-w-0">
                       <span className="font-bold text-sm text-[#1A1F36] truncate">{r.fullName}</span>
@@ -269,11 +273,12 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
       {/* ── Desktop / tablet table (≥ 640 px) ── */}
       <div className="hidden sm:block overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] border-collapse table-fixed">
+          <table className="w-full min-w-[1140px] border-collapse table-fixed">
             <thead>
               <tr className="border-b border-[#EAECF0] bg-[#FAFBFB]">
                 {[
-                  { label: 'Khách hàng', w: 'w-48 text-left pl-5' },
+                  { label: 'STT', w: 'w-14 text-center' },
+                  { label: 'Khách hàng', w: 'w-48 text-left' },
                   { label: 'Số điện thoại', w: 'w-32 text-left' },
                   { label: 'Ngày sinh', w: 'w-28 text-left' },
                   { label: 'Giờ sinh', w: 'w-20 text-left' },
@@ -285,7 +290,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                 ].map((c) => (
                   <th
                     key={c.label}
-                    className={`px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-[#667085] ${c.w}`}
+                    className={`px-3 py-3 text-xs font-semibold text-[#667085] ${c.w}`}
                   >
                     {c.label}
                   </th>
@@ -328,29 +333,36 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                         isOpen ? 'bg-[#EEF5F1]/10' : 'hover:bg-gray-50/40'
                       }`}
                     >
+                      {/* STT */}
+                      <td className="w-14 text-center py-3.5 align-middle">
+                        <span className="text-xs font-bold tabular-nums text-[#667085]">
+                          {rowNumber(i)}
+                        </span>
+                      </td>
+
                       {/* KHÁCH HÀNG */}
-                      <td className="w-48 text-left pl-5 py-3.5 align-middle">
+                      <td className="w-48 text-left py-3.5 align-middle">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEF5F1] text-[#1D4D3F] font-bold text-xs">
                             {getInitials(r.fullName)}
                           </div>
-                          <span className="font-bold text-sm text-[#1A1F36] truncate">{r.fullName}</span>
+                          <span className="font-bold text-base text-[#1A1F36] truncate">{r.fullName}</span>
                         </div>
                       </td>
 
                       {/* SỐ ĐIỆN THOẠI */}
-                      <td className="w-32 text-left py-3.5 text-xs font-semibold text-[#1A1F36] align-middle font-mono">
+                      <td className="w-32 text-left py-3.5 text-sm font-semibold text-[#1A1F36] align-middle font-mono">
                         {r.phoneNumber || '—'}
                       </td>
 
                       {/* NGÀY SINH */}
-                      <td className="w-28 text-left py-3.5 text-xs font-semibold text-[#1A1F36] align-middle">{r.birthDate}</td>
+                      <td className="w-28 text-left py-3.5 text-sm font-semibold text-[#1A1F36] align-middle">{r.birthDate}</td>
 
                       {/* GIỜ */}
-                      <td className="w-20 text-left py-3.5 text-xs font-semibold text-[#1A1F36] align-middle">{r.birthHour || '—'}</td>
+                      <td className="w-20 text-left py-3.5 text-sm font-semibold text-[#1A1F36] align-middle">{r.birthHour || '—'}</td>
 
                       {/* GIỚI TÍNH */}
-                      <td className="w-24 text-left py-3.5 text-xs font-semibold text-[#1A1F36] align-middle">{getGenderTextWithIcon(r.gender)}</td>
+                      <td className="w-24 text-left py-3.5 text-sm font-semibold text-[#1A1F36] align-middle">{getGenderTextWithIcon(r.gender)}</td>
 
                       {/* GÓI */}
                       <td className="w-44 text-left py-3.5 align-middle">
@@ -360,7 +372,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                       {/* CHI PHÍ */}
                       <td className="w-24 text-left py-3.5 align-middle">
                         {r.cost ? (
-                          <span className="text-xs font-bold text-[#1D4D3F] tabular-nums">
+                            <span className="text-sm font-bold text-[#1D4D3F] tabular-nums">
                             {Number(r.cost).toLocaleString('vi-VN')}đ
                           </span>
                         ) : (
@@ -369,7 +381,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                       </td>
 
                       {/* THỜI GIAN TẠO */}
-                      <td className="w-32 text-left py-3.5 text-xs text-[#525866] align-middle">
+                      <td className="w-32 text-left py-3.5 text-sm text-[#525866] align-middle">
                         <div className="flex flex-col leading-snug">
                           <span className="font-medium">{date}</span>
                           <span className="text-[10px] text-[#8A93A6] mt-0.5">{time}</span>
@@ -381,13 +393,13 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                         <div className="flex items-center justify-center">
                           <button
                             type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#3B82F6]/20 bg-[#EFF6FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white transition-all cursor-pointer shadow-sm"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-transparent text-[#3B82F6] transition-colors hover:text-[#1D4D3F] cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               setExpanded(isOpen ? null : i);
                             }}
                           >
-                            <Eye size={14} />
+                            <Eye size={18} />
                           </button>
                         </div>
                       </td>

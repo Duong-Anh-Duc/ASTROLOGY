@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getPrompt } from '../lib/store';
 import { getGeminiApiKey } from '../lib/settings';
+import { actualCustomerInstruction, customerBlock } from '../lib/customerContext';
 import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 
 /*
@@ -153,26 +154,6 @@ function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | nul
   return { mimeType: m[1], data: m[2] };
 }
 
-function customerBlock(customer: CustomerInfo): string {
-  return [
-    `- Họ tên: ${customer.fullName}`,
-    `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}`,
-    `- Giờ sinh: ${customer.hour === null ? 'Không rõ' : `${customer.hour}:${String(customer.minute ?? 0).padStart(2, '0')}`}`,
-    `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
-    customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
-    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
-    customer.question ? `- Việc cần xem: ${customer.question}` : '',
-    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
-  ].filter(Boolean).join('\n');
-}
-
-function actualCustomerInstruction(customer: CustomerInfo): string {
-  return `DỮ LIỆU THỰC TẾ CỦA LƯỢT LUẬN GIẢI NÀY:
-${customerBlock(customer)}
-
-Các tên, danh xưng, ví dụ hoặc tình tiết khách hàng có sẵn trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên. Luôn dùng dữ liệu thực tế này. Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
-}
-
 export async function analyzeTuTru(
   rawText: string,
   customer: CustomerInfo,
@@ -223,21 +204,6 @@ ${rawText}`;
   return { type: 'sim' satisfies PackageType, analysis, usage };
 }
 
-function customerBlockVi(customer: CustomerInfo): string {
-  return [
-    `- Họ tên: ${customer.fullName}`,
-    `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}`,
-    `- Giờ sinh: ${customer.hour ?? 'Không rõ'}`,
-    `- Giới tính: ${customer.gender === 'male' ? 'Nam' : 'Nữ'}`,
-    customer.phoneNumber ? `- Số điện thoại: ${customer.phoneNumber}` : '',
-    customer.addressing ? `- Cách xưng hô bắt buộc: ${customer.addressing}` : '',
-    customer.question ? `- Việc cần xem: ${customer.question}` : '',
-    customer.additionalContext ? `- Thông tin và yêu cầu riêng của lượt này:\n${customer.additionalContext}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
 export async function synthesize(
   geminiResults: GeminiAnalysis[],
   customer: CustomerInfo,
@@ -256,7 +222,7 @@ export async function synthesize(
     )
     .join('\n\n');
 
-  const userMessage = `KHÁCH HÀNG:\n${customerBlockVi(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng Markdown theo cấu trúc đã yêu cầu.`;
+  const userMessage = `KHÁCH HÀNG:\n${customerBlock(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng Markdown theo cấu trúc đã yêu cầu.`;
 
   const response = await Promise.race([
     model.generateContent(userMessage),
