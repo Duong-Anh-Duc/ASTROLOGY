@@ -487,7 +487,11 @@ export async function runReading(
       finalContent: finalContent ?? '',
       cost,
       screenshotPaths,
-      provider: currentProvider(),
+      provider: includeSynthesis
+        ? providerForSection('synthesize')
+        : analyses.length === 1
+          ? providerForSection(analyses[0].type)
+          : currentProvider(),
       createdAt: dbReading.createdAt,
     });
 

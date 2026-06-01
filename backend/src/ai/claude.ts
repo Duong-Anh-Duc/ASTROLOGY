@@ -301,7 +301,7 @@ export async function synthesize(
     )
     .join('\n\n');
 
-  const userMessage = `KHÁCH HÀNG:\n${customerBlock(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng văn bản báo cáo Word theo cấu trúc đã yêu cầu. Không dùng Markdown: không "#", không "##", không "**", không "---", không code fence.`;
+  const userMessage = `KHÁCH HÀNG:\n${customerBlock(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng văn bản báo cáo Word theo cấu trúc đã yêu cầu. Không dùng Markdown: không "#", không "##", không "**", không "---", không code fence. Trước khi trả lời, tự rà soát và loại bỏ toàn bộ từ/cụm từ trong danh sách cấm, kể cả khi chúng xuất hiện trong câu phủ định như "không ...".`;
 
   const { text, usage } = await runClaude(
     getPrompt('synthesize'),
