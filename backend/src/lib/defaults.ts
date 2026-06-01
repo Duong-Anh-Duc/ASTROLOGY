@@ -20,7 +20,7 @@ Nếu input có yêu cầu xưng hô cụ thể, phải dùng đúng. Ví dụ i
 
 - Trước khi viết, đọc dòng "Cặp xưng hô bắt buộc" trong dữ liệu khách hàng thật.
 - Từ câu chào, tiêu đề, từng phần luận giải đến lời kết, chỉ dùng đúng cặp đó. Ví dụ: nếu dữ liệu ghi người viết xưng "chị", gọi khách "em" thì toàn bài phải là "chị - em"; nếu ghi xưng "em", gọi khách "chị" thì toàn bài phải là "em - chị"; nếu ghi xưng "mình", gọi khách "bạn" thì toàn bài phải là "mình - bạn".
-- Không được đang gọi "chị" rồi chuyển sang "bạn", "anh", "em", "mệnh chủ", "quý khách" trong thân bài.
+- Không được đang gọi "chị" rồi chuyển sang "bạn", "anh", "em", "mình", "tớ", "cậu", "mệnh chủ", "quý khách" trong thân bài. Chỉ dùng đúng cặp đã khóa.
 - Khi cần nhắc tên riêng, dùng đúng "Tên gọi trong bài". Không tự rút tên làm sai vai vế.
 - Trước khi trả lời, tự rà lại một lượt để sửa mọi đại từ sai xưng hô.
 
@@ -130,7 +130,7 @@ Nếu input yêu cầu gọi là "bạn", dùng "bạn". Nếu yêu cầu gọi 
 QUY TẮC XƯNG HÔ XUYÊN SUỐT:
 - Trước khi viết, đọc dòng "Cặp xưng hô bắt buộc" trong dữ liệu khách hàng thật.
 - Từ câu chào, tiêu đề, từng phần luận giải đến lời kết, chỉ dùng đúng cặp đó. Ví dụ: nếu dữ liệu ghi người viết xưng "chị", gọi khách "em" thì toàn bài phải là "chị - em"; nếu ghi xưng "em", gọi khách "chị" thì toàn bài phải là "em - chị"; nếu ghi xưng "mình", gọi khách "bạn" thì toàn bài phải là "mình - bạn".
-- Không được đang gọi "chị" rồi chuyển sang "bạn", "anh", "em", "mệnh chủ", "quý khách" trong thân bài.
+- Không được đang gọi "chị" rồi chuyển sang "bạn", "anh", "em", "mình", "tớ", "cậu", "mệnh chủ", "quý khách" trong thân bài. Chỉ dùng đúng cặp đã khóa.
 - Khi cần nhắc tên riêng, dùng đúng "Tên gọi trong bài". Không tự rút tên làm sai vai vế.
 - Trước khi trả lời, tự rà lại một lượt để sửa mọi đại từ sai xưng hô.
 
@@ -343,7 +343,7 @@ NHIỆM VỤ — Soạn một bản luận giải dạng văn bản báo cáo Wo
 
 QUY TẮC XƯNG HÔ XUYÊN SUỐT:
 - Dữ liệu khách hàng có dòng "Cặp xưng hô bắt buộc". Đây là luật cao nhất về đại từ.
-- Từ tiêu đề, mở bài, thân bài đến lời kết, chỉ dùng đúng cặp xưng hô đó. Không đổi qua lại giữa anh/chị/bạn/em, không gọi "quý khách", không gọi "mệnh chủ" thay cho đại từ.
+- Từ tiêu đề, mở bài, thân bài đến lời kết, chỉ dùng đúng cặp xưng hô đó. Không đổi qua lại giữa anh/chị/bạn/em/mình/tớ/cậu, không gọi "quý khách", không gọi "mệnh chủ" thay cho đại từ.
 - Nếu dữ liệu ghi "Tên gọi trong bài", tiêu đề và lời chào phải dùng đúng tên gọi đó.
 - Trước khi trả lời, tự rà lại toàn bài và sửa mọi đại từ sai vai.
 

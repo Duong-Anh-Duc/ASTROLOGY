@@ -18,6 +18,24 @@ interface DivinationFormProps {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+function inferViewerPronoun(gender: 'male' | 'female' | 'other'): string {
+  return gender === 'female' ? 'chị' : 'anh';
+}
+
+function inferWriterPronoun(
+  viewerPronoun: string,
+  gender: 'male' | 'female' | 'other',
+): string {
+  const normalized = viewerPronoun.trim().toLocaleLowerCase('vi-VN');
+  if (normalized === 'em') return 'chị';
+  if (normalized === 'bạn') return 'mình';
+  if (normalized === 'cậu') return 'tớ';
+  if (normalized === 'mình') return 'bạn';
+  return inferViewerPronoun(gender) === 'chị' || inferViewerPronoun(gender) === 'anh'
+    ? 'em'
+    : 'mình';
+}
+
 export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) {
   const t = useTranslations('form');
 
@@ -31,7 +49,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [question, setQuestion] = useState('');
-  const [addressing, setAddressing] = useState('');
+  const [writerPronoun, setWriterPronoun] = useState('');
+  const [viewerPronoun, setViewerPronoun] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
   const [includeSynthesis, setIncludeSynthesis] = useState(false);
   const [useSolarTerms, setUseSolarTerms] = useState(true);
@@ -98,6 +117,12 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
     if (!validate()) return;
     const hourNum = hour.trim() === '' ? null : Number(hour);
     const minuteNum = minute.trim() === '' ? 0 : Number(minute);
+    const writer = writerPronoun.trim();
+    const viewer = viewerPronoun.trim();
+    const addressing =
+      writer || viewer
+        ? `người viết xưng "${writer || inferWriterPronoun(viewer, gender)}", gọi khách là "${viewer || inferViewerPronoun(gender)}"`
+        : undefined;
     onSubmit({
       fullName: fullName.trim(),
       day: Number(day),
@@ -110,7 +135,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
       packages,
       phoneNumber: packages.includes('sim') ? phoneNumber.trim() : undefined,
       question: question.trim() ? question.trim() : undefined,
-      addressing: addressing.trim() ? addressing.trim() : undefined,
+      addressing,
       additionalContext: additionalContext.trim() ? additionalContext.trim() : undefined,
       includeSynthesis: packages.length > 1 && includeSynthesis,
       useSolarTerms: useSolarTerms,
@@ -175,15 +200,27 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-semibold text-[#475467]">
-                      {t('addressingLabel')}
-                    </label>
-                    <div className="relative">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-semibold text-[#475467]">
+                        {t('writerPronounLabel')}
+                      </label>
                       <input
-                        value={addressing}
-                        onChange={(e) => setAddressing(e.target.value)}
-                        placeholder={t('addressingPlaceholder')}
+                        value={writerPronoun}
+                        onChange={(e) => setWriterPronoun(e.target.value)}
+                        placeholder={t('writerPronounPlaceholder')}
+                        autoComplete="off"
+                        className={cellCls}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-semibold text-[#475467]">
+                        {t('viewerPronounLabel')}
+                      </label>
+                      <input
+                        value={viewerPronoun}
+                        onChange={(e) => setViewerPronoun(e.target.value)}
+                        placeholder={t('viewerPronounPlaceholder')}
                         autoComplete="off"
                         className={cellCls}
                       />
