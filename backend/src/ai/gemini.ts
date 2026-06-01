@@ -218,11 +218,11 @@ export async function synthesize(
   const analysesBlock = geminiResults
     .map(
       (r) =>
-        `### ${r.type.toUpperCase()} ANALYSIS (JSON)\n${JSON.stringify(r.analysis, null, 2)}`,
+        `${r.type.toUpperCase()} - DU LIEU PHAN TICH\n${JSON.stringify(r.analysis, null, 2)}`,
     )
     .join('\n\n');
 
-  const userMessage = `KHÁCH HÀNG:\n${customerBlock(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng Markdown theo cấu trúc đã yêu cầu.`;
+  const userMessage = `KHÁCH HÀNG:\n${customerBlock(customer)}\n\nCÁC PHÂN TÍCH ĐÃ ĐƯỢC TRÍCH XUẤT:\n\n${analysesBlock}\n\nHãy soạn bản luận giải hoàn chỉnh dạng văn bản báo cáo Word theo cấu trúc đã yêu cầu. Không dùng Markdown: không "#", không "##", không "**", không "---", không code fence.`;
 
   const response = await Promise.race([
     model.generateContent(userMessage),

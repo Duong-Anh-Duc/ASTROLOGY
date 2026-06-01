@@ -2,7 +2,7 @@
 
 import { BookOpen, Calendar, ChevronDown, Clock, Compass, Info, MessageSquareText, Phone, Sparkles, User, Shield, Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ConfigProvider, DatePicker } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -20,7 +20,6 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) {
   const t = useTranslations('form');
-  const questionRef = useRef<HTMLSelectElement>(null);
 
   const [fullName, setFullName] = useState('');
   const [day, setDay] = useState<string>('');
@@ -35,7 +34,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const [addressing, setAddressing] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
   const [includeSynthesis, setIncludeSynthesis] = useState(false);
-  const [useSolarTerms, setUseSolarTerms] = useState(false);
+  const [useSolarTerms, setUseSolarTerms] = useState(true);
   const [packages, setPackages] = useState<PackageType[]>(['tuTru', 'maiHoa', 'sim']);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -372,22 +371,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     {t('questionLabel')}
                   </label>
                   <div className="relative">
-                    <select
-                      ref={questionRef}
+                    <input
+                      type="text"
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
-                      className={`${cellCls} pl-10 pr-10 appearance-none`}
-                    >
-                      <option value="" disabled hidden>Chọn nội dung cần xem</option>
-                      <option value="Sự nghiệp, công danh">Sự nghiệp, công danh</option>
-                      <option value="Tình duyên, gia đạo">Tình duyên, gia đạo</option>
-                      <option value="Tài lộc, tiền tài">Tài lộc, tiền tài</option>
-                      <option value="Sức khỏe, tật ách">Sức khỏe, tật ách</option>
-                      <option value="Cưới hỏi, hôn nhân">Cưới hỏi, hôn nhân</option>
-                      <option value="Tổng hợp toàn diện">Tổng hợp toàn diện</option>
-                    </select>
+                      placeholder={t('questionPlaceholder')}
+                      className={`${cellCls} pl-10`}
+                    />
                     <BookOpen size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#98A2B3] pointer-events-none" />
-                    <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#98A2B3] pointer-events-none" />
                   </div>
                 </div>
 
