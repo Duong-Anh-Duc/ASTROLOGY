@@ -36,7 +36,7 @@ const NA_YIN_BY_PAIR = [
   'Đại Hải Thủy',
 ];
 
-const TITLE_RE = /^(anh|chị|chi|bạn|ban|em|cô|co|chú|chu|bác|bac|thầy|thay|cậu|cau|mợ|mo|dì|di|ông|ong|bà|ba)$/i;
+const TITLE_RE = /^(anh|chị|chi|bạn|ban|em|cô|co|chú|chu|bác|bac|thầy|thay|cậu|cau|mợ|mo|dì|di|ông|ong|bà|ba|mình|minh)$/i;
 
 function sexagenaryYear(year: number): { canChi: string; naYin: string } {
   const index = ((year - 1984) % 60 + 60) % 60;
@@ -50,23 +50,68 @@ function defaultTitle(customer: CustomerInfo): string {
   return customer.gender === 'male' ? 'anh' : 'chị';
 }
 
+function cleanAddressing(addressing?: string): string {
+  return addressing?.replace(/[+_]+/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
+}
+
+function firstWord(value: string): string {
+  return value.trim().split(/\s+/)[0]?.toLocaleLowerCase('vi-VN') ?? '';
+}
+
+function canonicalTitle(title: string): string {
+  const map: Record<string, string> = {
+    chi: 'chị',
+    ban: 'bạn',
+    co: 'cô',
+    chu: 'chú',
+    bac: 'bác',
+    thay: 'thầy',
+    cau: 'cậu',
+    mo: 'mợ',
+    di: 'dì',
+    ong: 'ông',
+    ba: 'bà',
+    minh: 'mình',
+  };
+  return map[title] ?? title;
+}
+
 function displayName(customer: CustomerInfo): string {
   const name = customer.fullName.trim();
-  const addressing = customer.addressing?.trim();
+  const addressing = cleanAddressing(customer.addressing);
   if (!addressing) return `${defaultTitle(customer)} ${name}`;
 
   const lowerName = name.toLocaleLowerCase('vi-VN');
   const lowerAddressing = addressing.toLocaleLowerCase('vi-VN');
   if (lowerAddressing.includes(lowerName)) return addressing;
   if (TITLE_RE.test(addressing)) return `${addressing} ${name}`;
+  if (TITLE_RE.test(firstWord(addressing))) return addressing;
   return `${defaultTitle(customer)} ${name}`;
+}
+
+function customerPronoun(customer: CustomerInfo): string {
+  const title = firstWord(displayName(customer));
+  if (TITLE_RE.test(title)) return canonicalTitle(title);
+  return defaultTitle(customer);
+}
+
+function narratorPronoun(customer: CustomerInfo): string {
+  const title = customerPronoun(customer);
+  if (title === 'em') return 'chị';
+  if (title === 'bạn' || title === 'ban' || title === 'mình' || title === 'minh') return 'mình';
+  return 'em';
 }
 
 export function customerBlock(customer: CustomerInfo): string {
   const yearInfo = sexagenaryYear(customer.year);
+  const display = displayName(customer);
+  const customerCall = customerPronoun(customer);
+  const narrator = narratorPronoun(customer);
   return [
     `- Họ tên: ${customer.fullName}`,
-    `- Tên gọi trong bài: ${displayName(customer)}`,
+    `- Tên gọi trong bài: ${display}`,
+    `- Cặp xưng hô bắt buộc: người viết xưng "${narrator}", gọi khách là "${customerCall}" xuyên suốt toàn bài`,
+    `- Cách gọi khách khi chào/mở bài: ${display}`,
     `- Ngày sinh: ${customer.day}/${customer.month}/${customer.year}${customer.isLunar ? ' (Âm lịch)' : ' (Dương lịch)'}`,
     `- Năm sinh tham chiếu theo năm nhập: ${customer.year} - ${yearInfo.canChi}, nạp âm năm: ${yearInfo.naYin}`,
     `- Giờ sinh: ${customer.hour === null ? 'Không rõ' : `${customer.hour}:${String(customer.minute ?? 0).padStart(2, '0')}`}`,
@@ -86,7 +131,8 @@ ${customerBlock(customer)}
 
 QUY TẮC BẮT BUỘC:
 - Luôn dùng dữ liệu thực tế ở trên; mọi tên, danh xưng, ví dụ hoặc tình tiết trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên.
-- Khi viết tiêu đề hoặc mở bài, ưu tiên đúng "Tên gọi trong bài". Trong nội dung, tuân thủ "Cách xưng hô bắt buộc" nếu có; nếu không có thì xưng theo giới tính.
+- Khóa cứng cặp xưng hô ở dòng "Cặp xưng hô bắt buộc". Từ câu chào, tiêu đề, các phần thân bài đến lời kết đều chỉ dùng đúng cặp này. Không đổi qua lại giữa anh/chị/bạn/em.
+- Khi viết tiêu đề hoặc mở bài, dùng đúng "Tên gọi trong bài" hoặc "Cách gọi khách khi chào/mở bài". Trong nội dung, gọi khách bằng đúng đại từ đã khóa, không tự suy theo tuổi nếu input đã có cách xưng hô.
 - Khi luận nạp âm năm sinh, dùng dòng "Năm sinh tham chiếu theo năm nhập" làm mốc kiểm tra. Không tự đổi nạp âm năm sinh sang mệnh khác nếu lá số nguồn không chứng minh rõ.
 - Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
 }
