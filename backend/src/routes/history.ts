@@ -81,12 +81,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const id = req.params.id;
     await prisma.reading.delete({ where: { id } });
-    // Best-effort cleanup of the generated xlsx file
+    // Best-effort cleanup of generated export files.
     try {
       const { exportPathFor } = await import('../services/xlsx');
+      const { docxPathFor } = await import('../services/docx');
       const fs = await import('node:fs');
-      const p = exportPathFor(id);
-      if (fs.existsSync(p)) fs.unlinkSync(p);
+      for (const p of [exportPathFor(id), docxPathFor(id)]) {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
     } catch {
       // ignore
     }

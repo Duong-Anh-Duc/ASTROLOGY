@@ -48,8 +48,8 @@ export interface CostInfo {
 
 export interface ApiResponse {
   success: boolean;
-  xlsxUrl?: string;
-  xlsxFileName?: string;
+  docxUrl?: string;
+  docxFileName?: string;
   cost?: CostInfo;
   error?: string;
 }

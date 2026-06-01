@@ -13,6 +13,7 @@ import {
   providerForSection,
 } from '../ai/aiProvider';
 import { addUsage, calcCost, emptyUsage } from '../lib/usage';
+import { generateDocx } from './docx';
 import { saveScreenshot } from './storage';
 import type {
   CustomerInfo,
@@ -273,8 +274,8 @@ function formatByType(type: PackageType, a: Record<string, unknown>): string {
 export interface RunResult {
   success: boolean;
   readingId?: string;
-  xlsxUrl?: string;
-  xlsxFileName?: string;
+  docxUrl?: string;
+  docxFileName?: string;
   cost?: ReturnType<typeof calcCost>;
   error?: string;
 }
@@ -313,6 +314,7 @@ export async function runReading(
       question: customer.question ?? null,
       addressing: customer.addressing ?? null,
       additionalContext: customer.additionalContext ?? null,
+      includeSynthesis: customer.includeSynthesis === true && customer.packages.length > 1,
       useSolarTerms: customer.useSolarTerms ?? false,
       yearcalc: customer.yearcalc ?? null,
       status: 'running',
@@ -443,6 +445,7 @@ export async function runReading(
 
     // Persist Analysis rows + save screenshots locally
     console.log(`[${dbReading.id}] STEP 3.5 — persist analyses — start`);
+    const screenshotPaths: Partial<Record<PackageType, string>> = {};
     for (let i = 0; i < scraperResults.length; i++) {
       const sr = scraperResults[i];
       const ai = analyses[i];
@@ -453,6 +456,7 @@ export async function runReading(
           const saved = saveScreenshot(dbReading.id, sr.type, sr.screenshotPng);
           screenshotUrl = saved.url;
           screenshotPath = saved.filePath;
+          screenshotPaths[sr.type] = saved.filePath;
         } catch (e) {
           console.error(`[${dbReading.id}] save screenshot ${sr.type} failed:`, e);
         }
@@ -475,6 +479,18 @@ export async function runReading(
     }
     console.log(`[${dbReading.id}] STEP 3.5 — persist analyses — done`);
 
+    onProgress?.('exporting');
+    const docx = await generateDocx({
+      readingId: dbReading.id,
+      customer,
+      analyses,
+      finalContent: finalContent ?? '',
+      cost,
+      screenshotPaths,
+      provider: currentProvider(),
+      createdAt: dbReading.createdAt,
+    });
+
     // Finalise reading
     await prisma.reading.update({
       where: { id: dbReading.id },
@@ -490,7 +506,13 @@ export async function runReading(
     });
 
     console.log(`[${dbReading.id}] RUN — done`);
-    return { success: true, readingId: dbReading.id, cost };
+    return {
+      success: true,
+      readingId: dbReading.id,
+      docxUrl: docx.url,
+      docxFileName: docx.fileName,
+      cost,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[${dbReading.id}] RUN — error:`, message);

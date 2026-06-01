@@ -49,6 +49,8 @@ export interface CostInfo {
 export interface ApiResponse {
   success: boolean;
   sheetUrl?: string;
+  docxUrl?: string;
+  docxFileName?: string;
   cost?: CostInfo;
   error?: string;
 }

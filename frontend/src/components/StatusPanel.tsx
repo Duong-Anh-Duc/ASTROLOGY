@@ -30,8 +30,8 @@ interface StatusPanelProps {
   customerName: string;
   packages?: PackageType[];
   includeSynthesis?: boolean;
-  xlsxUrl?: string;
-  xlsxFileName?: string;
+  docxUrl?: string;
+  docxFileName?: string;
   cost?: CostInfo;
   errorMessage?: string;
   onMinimize?: () => void;
@@ -45,7 +45,7 @@ const PACKAGE_LABELS: Record<PackageType, string> = {
   sim: 'Sim phong thủy',
 };
 
-type Phase = 'scraping' | 'analyzing' | 'synthesizing';
+type Phase = 'scraping' | 'analyzing' | 'synthesizing' | 'exporting';
 
 interface VisibleStep {
   key: string;
@@ -57,6 +57,7 @@ const PHASE_ORDER: Record<Phase, number> = {
   scraping: 0,
   analyzing: 1,
   synthesizing: 2,
+  exporting: 3,
 };
 
 export function StatusPanel({
@@ -64,8 +65,8 @@ export function StatusPanel({
   customerName,
   packages = [],
   includeSynthesis = false,
-  xlsxUrl,
-  xlsxFileName,
+  docxUrl,
+  docxFileName,
   cost,
   errorMessage,
   onMinimize,
@@ -131,14 +132,14 @@ export function StatusPanel({
         )}
 
         <div className="flex flex-col gap-3.5 sm:flex-row mt-2">
-          {xlsxUrl && (
+          {docxUrl && (
             <a
-              href={xlsxUrl}
-              download={xlsxFileName ?? true}
+              href={docxUrl}
+              download={docxFileName ?? true}
               className="inline-flex h-12 flex-1 items-center justify-center gap-2.5 rounded-full bg-[#1D4D3F] px-6 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#153A2F]"
             >
               <Download size={16} />
-              <span>{t('downloadXlsx')}</span>
+              <span>{t('downloadDocx')}</span>
             </a>
           )}
           <Button
@@ -216,12 +217,19 @@ export function StatusPanel({
           },
         ]
       : []),
+    {
+      key: 'exporting',
+      phase: 'exporting' as const,
+      label: t('exporting'),
+    },
   ];
   const currentPhase = step === 'synthesizing'
     ? 'synthesizing'
     : step === 'analyzing'
       ? 'analyzing'
-      : 'scraping';
+      : step === 'exporting'
+        ? 'exporting'
+        : 'scraping';
   const currentOrder = PHASE_ORDER[currentPhase];
 
   return (

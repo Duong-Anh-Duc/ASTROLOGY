@@ -19,7 +19,7 @@ import type {
 type RunState =
   | { kind: 'idle' }
   | { kind: 'running'; step: ProcessingStep; customer: CustomerInfo }
-  | { kind: 'done'; customer: CustomerInfo; xlsxUrl?: string; xlsxFileName?: string; cost?: CostInfo }
+  | { kind: 'done'; customer: CustomerInfo; docxUrl?: string; docxFileName?: string; cost?: CostInfo }
   | { kind: 'error'; customer: CustomerInfo; message: string };
 
 type RunningStep = Exclude<ProcessingStep, 'idle' | 'done' | 'error'>;
@@ -127,8 +127,8 @@ export default function HomePage() {
       setState({
         kind: 'done',
         customer: data,
-        xlsxUrl: body.xlsxUrl,
-        xlsxFileName: body.xlsxFileName,
+        docxUrl: body.docxUrl,
+        docxFileName: body.docxFileName,
         cost: body.cost,
       });
       setHistoryRefresh((n) => n + 1);
@@ -224,8 +224,8 @@ export default function HomePage() {
               <StatusPanel
                 step="done"
                 customerName={state.customer.fullName}
-                xlsxUrl={state.xlsxUrl}
-                xlsxFileName={state.xlsxFileName}
+                docxUrl={state.docxUrl}
+                docxFileName={state.docxFileName}
                 cost={state.cost}
                 onRetry={() => startRun(state.customer)}
                 onReset={dismiss}
