@@ -209,7 +209,8 @@ function isMajorHeading(line: string): boolean {
     /^PHẦN\s+[IVXLC\d]+[:.]/i.test(clean) ||
     /^\d+\.\s+[A-ZÀ-Ỹ0-9 ,&/-]{6,}$/.test(clean) ||
     /^#{1,3}\s+/.test(clean) ||
-    /^═{2,}\s*.+\s*═{2,}$/.test(clean)
+    /^═{2,}\s*.+\s*═{2,}$/.test(clean) ||
+    /^—\s*.+\s*—$/.test(clean)
   );
 }
 
@@ -218,12 +219,15 @@ function normalizeHeading(line: string): string {
     .replace(/^#{1,6}\s+/, '')
     .replace(/^═+\s*/, '')
     .replace(/\s*═+$/, '')
+    .replace(/^—\s*/, '')
+    .replace(/\s*—$/, '')
     .trim();
 }
 
 function markdownToDocxChildren(markdown: string): Paragraph[] {
   const text = markdownToPlainText(markdown)
     .replace(/\r\n/g, '\n')
+    .replace(/^\s*(?:-{3,}|—{3,}|═{3,})\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   if (!text) return [];
@@ -256,6 +260,10 @@ function markdownToDocxChildren(markdown: string): Paragraph[] {
     }
   }
   return children;
+}
+
+function cleanProseMode(packages: PackageType[], finalContent: string): boolean {
+  return packages.length === 1 && packages[0] === 'maiHoa' && !finalContent.trim();
 }
 
 function imageType(data: Buffer): 'jpg' | 'png' {
@@ -312,70 +320,80 @@ export async function generateDocx(input: GenerateDocxInput): Promise<GenerateDo
   const orderedAnalyses = ORDER.map((pkg) => analyses.find((analysis) => analysis.type === pkg)).filter(
     (analysis): analysis is GeminiAnalysis => Boolean(analysis),
   );
+  const cleanProse = cleanProseMode(packages, finalContent);
 
-  const children: (Paragraph | Table)[] = [
-    paragraph(reportTitle(packages), {
-      bold: true,
-      color: PURPLE,
-      size: 36,
-      alignment: AlignmentType.CENTER,
-      spacingAfter: 200,
-    }),
-    paragraph(customer.fullName, {
-      bold: true,
-      italics: true,
-      color: MUTED,
-      size: 28,
-      alignment: AlignmentType.CENTER,
-      spacingAfter: 240,
-    }),
-    metaTable([
-      ['Họ và tên', customer.fullName],
-      ['Ngày sinh', birthInfo(customer)],
-      ['Giờ sinh', hourInfo(customer)],
-      ['Giới tính', customer.gender === 'male' ? 'Nam' : 'Nữ'],
-      ['Nội dung', packageScope(packages)],
-      ...(customer.phoneNumber ? ([['Số điện thoại', customer.phoneNumber]] as [string, string][]) : []),
-      ...(customer.question ? ([['Việc cần xem', customer.question]] as [string, string][]) : []),
-      ...(customer.addressing ? ([['Cách xưng hô', customer.addressing]] as [string, string][]) : []),
-      ['Thời điểm tạo', createdAt.toLocaleString('vi-VN')],
-      ['Model AI', provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'],
-      ...(cost ? ([['Chi phí AI', `${cost.vnd.toLocaleString('vi-VN')}đ`]] as [string, string][]) : []),
-    ]),
-    emptyLine(),
-  ];
+  const children: (Paragraph | Table)[] = [];
 
-  for (const analysis of orderedAnalyses) {
-    const imgPath = screenshotPaths?.[analysis.type];
-    if (!imgPath) continue;
-    const img = imageParagraph(imgPath);
-    if (!img) continue;
-    children.push(sectionTitle(CHART_TITLE[analysis.type]), img, emptyLine());
-  }
+  if (cleanProse) {
+    const onlyAnalysis = orderedAnalyses[0];
+    if (onlyAnalysis) {
+      children.push(...markdownToDocxChildren(formatByType(onlyAnalysis.type, onlyAnalysis.analysis)));
+    }
+  } else {
+    children.push(
+      paragraph(reportTitle(packages), {
+        bold: true,
+        color: PURPLE,
+        size: 36,
+        alignment: AlignmentType.CENTER,
+        spacingAfter: 200,
+      }),
+      paragraph(customer.fullName, {
+        bold: true,
+        italics: true,
+        color: MUTED,
+        size: 28,
+        alignment: AlignmentType.CENTER,
+        spacingAfter: 240,
+      }),
+      metaTable([
+        ['Họ và tên', customer.fullName],
+        ['Ngày sinh', birthInfo(customer)],
+        ['Giờ sinh', hourInfo(customer)],
+        ['Giới tính', customer.gender === 'male' ? 'Nam' : 'Nữ'],
+        ['Nội dung', packageScope(packages)],
+        ...(customer.phoneNumber ? ([['Số điện thoại', customer.phoneNumber]] as [string, string][]) : []),
+        ...(customer.question ? ([['Việc cần xem', customer.question]] as [string, string][]) : []),
+        ...(customer.addressing ? ([['Cách xưng hô', customer.addressing]] as [string, string][]) : []),
+        ['Thời điểm tạo', createdAt.toLocaleString('vi-VN')],
+        ['Model AI', provider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'],
+        ...(cost ? ([['Chi phí AI', `${cost.vnd.toLocaleString('vi-VN')}đ`]] as [string, string][]) : []),
+      ]),
+      emptyLine(),
+    );
 
-  children.push(new Paragraph({ children: [new PageBreak()] }));
+    for (const analysis of orderedAnalyses) {
+      const imgPath = screenshotPaths?.[analysis.type];
+      if (!imgPath) continue;
+      const img = imageParagraph(imgPath);
+      if (!img) continue;
+      children.push(sectionTitle(CHART_TITLE[analysis.type]), img, emptyLine());
+    }
 
-  if (finalContent.trim()) {
-    children.push(sectionTitle('PHẦN I: TỔNG HỢP CHUNG'));
-    children.push(...markdownToDocxChildren(finalContent));
     children.push(new Paragraph({ children: [new PageBreak()] }));
-  }
 
-  const startIndex = finalContent.trim() ? 2 : 1;
-  orderedAnalyses.forEach((analysis, index) => {
-    children.push(sectionTitle(`PHẦN ${toRoman(startIndex + index)}: ${PACKAGE_TITLE[analysis.type]}`));
-    children.push(...markdownToDocxChildren(formatByType(analysis.type, analysis.analysis)));
-    if (index < orderedAnalyses.length - 1) {
+    if (finalContent.trim()) {
+      children.push(sectionTitle('PHẦN I: TỔNG HỢP CHUNG'));
+      children.push(...markdownToDocxChildren(finalContent));
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }
-  });
 
-  children.push(
-    emptyLine(),
-    paragraph('Thương mến,', { italics: true, size: 24, spacingBefore: 220 }),
-    paragraph('Bùi Linh Tường Vân', { bold: true, color: PURPLE_DARK, size: 26, spacingAfter: 40 }),
-    paragraph('Chuyên gia phong thủy', { italics: true, color: MUTED, size: 22 }),
-  );
+    const startIndex = finalContent.trim() ? 2 : 1;
+    orderedAnalyses.forEach((analysis, index) => {
+      children.push(sectionTitle(`PHẦN ${toRoman(startIndex + index)}: ${PACKAGE_TITLE[analysis.type]}`));
+      children.push(...markdownToDocxChildren(formatByType(analysis.type, analysis.analysis)));
+      if (index < orderedAnalyses.length - 1) {
+        children.push(new Paragraph({ children: [new PageBreak()] }));
+      }
+    });
+
+    children.push(
+      emptyLine(),
+      paragraph('Thương mến,', { italics: true, size: 24, spacingBefore: 220 }),
+      paragraph('Bùi Linh Tường Vân', { bold: true, color: PURPLE_DARK, size: 26, spacingAfter: 40 }),
+      paragraph('Chuyên gia phong thủy', { italics: true, color: MUTED, size: 22 }),
+    );
+  }
 
   const doc = new Document({
     creator: 'Bùi Linh Tường Vân',
@@ -395,31 +413,35 @@ export async function generateDocx(input: GenerateDocxInput): Promise<GenerateDo
             margin: { top: 900, right: 900, bottom: 900, left: 900 },
           },
         },
-        headers: {
-          default: new Header({
-            children: [
-              paragraph('Bùi Linh Tường Vân - Chuyên gia phong thủy', {
-                alignment: AlignmentType.RIGHT,
-                color: MUTED,
-                size: 18,
-                spacingAfter: 0,
-              }),
-            ],
-          }),
-        },
-        footers: {
-          default: new Footer({
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
+        headers: cleanProse
+          ? undefined
+          : {
+              default: new Header({
                 children: [
-                  new TextRun({ text: 'Trang ', font: FONT, size: 18, color: MUTED }),
-                  new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 18, color: MUTED }),
+                  paragraph('Bùi Linh Tường Vân - Chuyên gia phong thủy', {
+                    alignment: AlignmentType.RIGHT,
+                    color: MUTED,
+                    size: 18,
+                    spacingAfter: 0,
+                  }),
                 ],
               }),
-            ],
-          }),
-        },
+            },
+        footers: cleanProse
+          ? undefined
+          : {
+              default: new Footer({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [
+                      new TextRun({ text: 'Trang ', font: FONT, size: 18, color: MUTED }),
+                      new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 18, color: MUTED }),
+                    ],
+                  }),
+                ],
+              }),
+            },
         children,
       },
     ],
