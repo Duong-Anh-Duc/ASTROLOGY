@@ -1,10 +1,12 @@
 'use client';
 
 import { BookOpen, Calendar, ChevronDown, Clock, Compass, Info, MessageSquareText, Phone, Sparkles, User, Shield, Check } from 'lucide-react';
+import { useLocale } from 'next-intl';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ConfigProvider, DatePicker } from 'antd';
 import viVN from 'antd/locale/vi_VN';
+import enUS from 'antd/locale/en_US';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/vi';
 import type { CustomerInfo, Gender, PackageType } from '../types';
@@ -42,6 +44,7 @@ function firstPronoun(value: string): string {
 
 export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) {
   const t = useTranslations('form');
+  const locale = useLocale();
 
   const [fullName, setFullName] = useState('');
   const [day, setDay] = useState<string>('');
@@ -181,14 +184,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     <User size={12} strokeWidth={2.5} />
                   </div>
                   <span className="text-sm font-semibold text-[#475467]">
-                    THÔNG TIN NGƯỜI XEM
+                    {t('sectionProfile')}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-[#475467]">
-                      Tên người cần xem
+                      {t('customerName')}
                     </label>
                     <div className="relative">
                       <input
@@ -211,24 +214,24 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-semibold text-[#475467]">
-                        Danh xưng mình tự xưng
+                        {t('writerPronounLabel')}
                       </label>
                       <input
                         value={writerPronoun}
                         onChange={(e) => setWriterPronoun(e.target.value)}
-                        placeholder="Ví dụ: chị, em, mình"
+                        placeholder={t('writerPronounPlaceholder')}
                         autoComplete="off"
                         className={cellCls}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-semibold text-[#475467]">
-                        Danh xưng gọi người xem
+                        {t('viewerPronounLabel')}
                       </label>
                       <input
                         value={viewerDisplayName}
                         onChange={(e) => setViewerDisplayName(e.target.value)}
-                        placeholder="Ví dụ: em Ly, chị Lan, bạn Hùng"
+                        placeholder={t('viewerPronounPlaceholder')}
                         autoComplete="off"
                         className={cellCls}
                       />
@@ -242,7 +245,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                       {t('birthDate')}
                     </label>
                     <ConfigProvider
-                      locale={viVN}
+                      locale={locale === 'en' ? enUS : viVN}
                       theme={{
                         token: {
                           colorPrimary: '#1D4D3F',
@@ -290,7 +293,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-[#475467]">
-                      Giờ sinh <span className="text-[10px] text-[#8A93A6] font-normal">({t('birthHourHint').toLowerCase()})</span>
+                      {t('birthHour')} <span className="text-[10px] text-[#8A93A6] font-normal">({t('birthHourHint').toLowerCase()})</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="relative">
@@ -299,7 +302,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                           onChange={(e) => setHour(e.target.value)}
                           className={`${cellCls} pr-8 appearance-none font-medium text-center`}
                         >
-                          <option value="">Giờ</option>
+                          <option value="">{t('hourUnit')}</option>
                           {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map((h) => (
                             <option key={h} value={h}>{h}</option>
                           ))}
@@ -338,7 +341,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                             : 'bg-white text-[#475467] hover:bg-gray-50'
                         }`}
                       >
-                        ♂ Nam
+                        ♂ {t('male')}
                       </button>
                       <div className="w-[1px] bg-[#E5E7EB]" />
                       <button
@@ -350,7 +353,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                             : 'bg-white text-[#475467] hover:bg-gray-50'
                         }`}
                       >
-                        ♀ Nữ
+                        ♀ {t('female')}
                       </button>
                       <div className="w-[1px] bg-[#E5E7EB]" />
                       <button
@@ -362,7 +365,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                             : 'bg-white text-[#475467] hover:bg-gray-50'
                         }`}
                       >
-                        ⚧ Khác
+                        ⚧ {t('other')}
                       </button>
                     </div>
                   </div>
@@ -381,7 +384,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                             : 'bg-white text-[#475467] hover:bg-gray-50'
                         }`}
                       >
-                        Dương lịch
+                        {t('solarCalendar')}
                       </button>
                       <div className="w-[1px] bg-[#E5E7EB]" />
                       <button
@@ -393,7 +396,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                             : 'bg-white text-[#475467] hover:bg-gray-50'
                         }`}
                       >
-                        Âm lịch
+                        {t('lunarCalendar')}
                       </button>
                     </div>
                   </div>
@@ -407,7 +410,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     <MessageSquareText size={12} strokeWidth={2.5} />
                   </div>
                   <span className="text-sm font-semibold text-[#475467]">
-                    Yêu cầu đặc biệt
+                    {t('sectionRequest')}
                   </span>
                 </div>
 
@@ -429,12 +432,12 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-[#475467]">
-                    Yêu cầu đặc biệt / tình thân cần thể hiện
+                    {t('additionalContextLabel')}
                   </label>
                   <textarea
                     value={additionalContext}
                     onChange={(e) => setAdditionalContext(e.target.value)}
-                    placeholder="Ví dụ: em gái thân thiết, bạn nối khố 20 năm, đã lấy chồng và có 1 con gái đầu; viết thật ấm, nói thẳng vì thương, nhắc kỷ niệm nếu có"
+                    placeholder={t('additionalContextPlaceholder')}
                     rows={4}
                     className={`${cellCls} h-auto min-h-24 resize-y py-3 leading-relaxed`}
                   />
@@ -474,7 +477,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 {t('servicePackages')}
               </h2>
               <span className="text-sm text-[#667085] font-medium mt-1.5">
-                Chọn các gói phù hợp với nhu cầu của bạn.
+                {t('packagesHint')}
               </span>
             </div>
 
@@ -626,7 +629,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
             }`}>
               <div className="flex flex-col gap-1 border-t border-[#EAECF0] pt-3.5 mt-1">
                 <label className="text-[11px] font-semibold text-[#475467]">
-                  Số điện thoại cần xem <span className="text-[10px] text-[#8A93A6] font-normal">(không bắt buộc)</span>
+                  {t('phoneNumber')} <span className="text-[10px] text-[#8A93A6] font-normal">({t('optional')})</span>
                 </label>
                 <div className="relative">
                   <input
@@ -654,8 +657,8 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                 <Shield size={14} />
               </div>
               <p className="text-[11px] leading-normal text-[#525866]">
-                <strong className="font-bold text-[#1D4D3F] mr-1">Bảo mật thông tin:</strong>
-                Mọi dữ liệu bạn cung cấp sẽ được bảo mật tuyệt đối và chỉ phục vụ cho mục đích luận giải.
+                <strong className="font-bold text-[#1D4D3F] mr-1">{t('privacyTitle')}:</strong>
+                {t('privacyText')}
               </p>
             </div>
 
@@ -670,7 +673,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
                   <>
-                    <span>Tạo hồ sơ & Bắt đầu luận giải</span>
+                    <span>{t('runButton')}</span>
                     <span className="text-base font-medium ml-1">→</span>
                   </>
                 )}

@@ -39,12 +39,6 @@ interface StatusPanelProps {
   onReset: () => void;
 }
 
-const PACKAGE_LABELS: Record<PackageType, string> = {
-  tuTru: 'Bát tự',
-  maiHoa: 'Kinh dịch',
-  sim: 'Sim phong thủy',
-};
-
 type Phase = 'scraping' | 'analyzing' | 'synthesizing' | 'exporting';
 
 interface VisibleStep {
@@ -75,6 +69,7 @@ export function StatusPanel({
 }: StatusPanelProps) {
   const t = useTranslations('status');
   const tCommon = useTranslations('common');
+  const tForm = useTranslations('form');
 
   const startRef = useRef<number>(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -197,16 +192,21 @@ export function StatusPanel({
   }
 
   const selectedPackages: PackageType[] = packages.length > 0 ? packages : ['tuTru'];
+  const packageLabel = (pkg: PackageType) => {
+    if (pkg === 'tuTru') return tForm('packageTuTru');
+    if (pkg === 'maiHoa') return tForm('packageMaiHoa');
+    return tForm('packageSim');
+  };
   const visibleSteps: VisibleStep[] = [
     ...selectedPackages.map((pkg) => ({
       key: `scraping-${pkg}`,
       phase: 'scraping' as const,
-      label: t('scrapingPackage', { package: PACKAGE_LABELS[pkg] }),
+      label: t('scrapingPackage', { package: packageLabel(pkg) }),
     })),
     ...selectedPackages.map((pkg) => ({
       key: `analyzing-${pkg}`,
       phase: 'analyzing' as const,
-      label: t('analyzingPackage', { package: PACKAGE_LABELS[pkg] }),
+      label: t('analyzingPackage', { package: packageLabel(pkg) }),
     })),
     ...(includeSynthesis && selectedPackages.length > 1
       ? [

@@ -1,6 +1,7 @@
 'use client';
 
 import { RefreshCw, Search, Sparkles, Eye, SlidersHorizontal, Plus, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { useLocale } from 'next-intl';
 import { useTranslations } from 'next-intl';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 
@@ -27,35 +28,39 @@ interface HistoryTableProps {
   refreshSignal: number;
 }
 
-function formatTimestamp(iso: string): { date: string; time: string } {
+function formatTimestamp(iso: string, locale: string): { date: string; time: string } {
   if (!iso) return { date: '', time: '' };
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { date: iso, time: '' };
+  const browserLocale = locale === 'en' ? 'en-US' : 'vi-VN';
   return {
-    date: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString(browserLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    time: d.toLocaleTimeString(browserLocale, { hour: '2-digit', minute: '2-digit' }),
   };
 }
 
-function parsePackages(packages: string): string[] {
+function packageLabelKey(rawPackage: string): string {
+  const raw = rawPackage.trim();
+  const lower = raw.toLowerCase();
+  if (raw.includes('Bát') || raw.includes('Tứ') || lower === 'tutru') return 'badgeTuTru';
+  if (raw.includes('Kinh') || raw.includes('Mai') || lower === 'maihoa') return 'badgeMaiHoa';
+  if (raw.includes('Sim') || lower === 'sim') return 'badgeSim';
+  return '';
+}
+
+function parsePackageKeys(packages: string): string[] {
   return packages
     .split(',')
     .map((pkg) => {
-      const raw = pkg.trim();
-      if (!raw) return '';
-      if (raw.includes('Bát Tự') || raw.includes('Tứ Trụ') || raw.toLowerCase() === 'tutru')
-        return 'Bát tự';
-      if (raw.includes('Kinh Dịch') || raw.includes('Mai Hoa') || raw.toLowerCase() === 'maihoa')
-        return 'Kinh dịch';
-      if (raw.includes('Sim') || raw.toLowerCase() === 'sim')
-        return 'Sim';
-      return raw.slice(0, 8);
+      const key = packageLabelKey(pkg);
+      return key || pkg.trim().slice(0, 8);
     })
     .filter(Boolean);
 }
 
 function PackageChips({ packages }: { packages: string }) {
-  const chips = parsePackages(packages);
+  const t = useTranslations('history');
+  const chips = parsePackageKeys(packages);
   return (
     <div className="flex gap-1.5 flex-wrap">
       {chips.map((chip, i) => (
@@ -63,7 +68,7 @@ function PackageChips({ packages }: { packages: string }) {
           key={i}
           className="inline-flex items-center rounded-md bg-[#EEF5F1] text-[#1D4D3F] px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap"
         >
-          {chip}
+          {chip.startsWith('badge') ? t(chip) : chip}
         </span>
       ))}
     </div>
@@ -91,6 +96,7 @@ function getInitials(name: string) {
 
 export function HistoryTable({ refreshSignal }: HistoryTableProps) {
   const t = useTranslations('history');
+  const locale = useLocale();
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState<string>('');
@@ -139,9 +145,9 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
 
   const getGenderTextWithIcon = (genderVal: string) => {
     const clean = genderVal.trim().toLowerCase();
-    if (clean.includes('nam') || clean === 'male') return '♂ Nam';
-    if (clean.includes('nữ') || clean === 'female') return '♀ Nữ';
-    return '⚧ Khác';
+    if (clean.includes('nam') || clean === 'male') return `♂ ${t('genderMale')}`;
+    if (clean.includes('nữ') || clean === 'female') return `♀ ${t('genderFemale')}`;
+    return `⚧ ${t('genderOther')}`;
   };
 
   return (
@@ -151,10 +157,10 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-xl font-bold text-[#0C1F19]">
-            Lịch sử luận giải
+            {t('title')}
           </h2>
           <p className="text-xs text-text-tertiary">
-            Tất cả khách hàng đã được luận giải — lưu trong hệ thống
+            {t('subtitle')}
           </p>
         </div>
 
@@ -165,7 +171,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm kiếm theo tên, SĐT..."
+              placeholder={t('searchPlaceholder')}
               className="h-9 w-full sm:w-60 rounded-lg border border-[#E5E7EB] bg-white pl-3.5 pr-9 text-xs text-[#1A1F36] placeholder:text-[#98A2B3] focus:border-[#1D4D3F] focus:outline-none transition-all"
             />
             <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
@@ -177,7 +183,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-xs font-semibold text-[#475467] hover:bg-gray-50 hover:text-[#1D4D3F] transition-all cursor-pointer"
           >
             <SlidersHorizontal size={13} />
-            <span>Bộ lọc</span>
+            <span>{t('filter')}</span>
           </button>
 
           {/* Add New Button */}
@@ -187,7 +193,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#1D4D3F] hover:bg-[#153A2F] px-3.5 text-xs font-semibold text-white transition-all cursor-pointer shadow-sm"
           >
             <Plus size={14} strokeWidth={2.5} />
-            <span>Tạo mới</span>
+            <span>{t('createNew')}</span>
           </button>
         </div>
       </div>
@@ -238,7 +244,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                     <PackageChips packages={r.packages} />
                     {r.cost && (
                       <span className="text-[11px] font-bold text-[#1D4D3F]">
-                        {Number(r.cost).toLocaleString('vi-VN')}đ
+                        {Number(r.cost).toLocaleString(locale === 'en' ? 'en-US' : 'vi-VN')}đ
                       </span>
                     )}
                   </div>
@@ -256,7 +262,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
 
                 <div className="flex items-center justify-end gap-2 mt-3 pt-2.5 border-t border-gray-100">
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-[#1D4D3F]">
-                    {isOpen ? '▲ Đóng chi tiết' : '▼ Xem chi tiết'}
+                    {isOpen ? t('collapseDetails') : t('expandDetails')}
                   </span>
                 </div>
               </button>
@@ -277,16 +283,16 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
             <thead>
               <tr className="border-b border-[#EAECF0] bg-[#FAFBFB]">
                 {[
-                  { label: 'STT', w: 'w-14 text-center' },
-                  { label: 'Khách hàng', w: 'w-48 text-left' },
-                  { label: 'Số điện thoại', w: 'w-32 text-left' },
-                  { label: 'Ngày sinh', w: 'w-28 text-left' },
-                  { label: 'Giờ sinh', w: 'w-20 text-left' },
-                  { label: 'Giới tính', w: 'w-24 text-left' },
-                  { label: 'Gói dịch vụ', w: 'w-44 text-left' },
-                  { label: 'Chi phí', w: 'w-24 text-left' },
-                  { label: 'Thời gian tạo', w: 'w-32 text-left' },
-                  { label: 'Thao tác', w: 'w-20 text-center' },
+                  { label: t('colIndex'), w: 'w-14 text-center' },
+                  { label: t('colName'), w: 'w-48 text-left' },
+                  { label: t('colPhone'), w: 'w-32 text-left' },
+                  { label: t('colBirth'), w: 'w-28 text-left' },
+                  { label: t('colHour'), w: 'w-20 text-left' },
+                  { label: t('colGender'), w: 'w-24 text-left' },
+                  { label: t('colPackages'), w: 'w-44 text-left' },
+                  { label: t('colCost'), w: 'w-24 text-left' },
+                  { label: t('colTime'), w: 'w-32 text-left' },
+                  { label: t('colDetails'), w: 'w-20 text-center' },
                 ].map((c) => (
                   <th
                     key={c.label}
@@ -325,7 +331,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
 
               {rows.map((r, i) => {
                 const isOpen = expanded === i;
-                const { date, time } = formatTimestamp(r.timestamp);
+                const { date, time } = formatTimestamp(r.timestamp, locale);
                 return (
                   <Fragment key={i}>
                     <tr
@@ -373,7 +379,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
                       <td className="w-24 text-left py-3.5 align-middle">
                         {r.cost ? (
                             <span className="text-sm font-bold text-[#1D4D3F] tabular-nums">
-                            {Number(r.cost).toLocaleString('vi-VN')}đ
+                            {Number(r.cost).toLocaleString(locale === 'en' ? 'en-US' : 'vi-VN')}đ
                           </span>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
@@ -425,7 +431,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
         <div className="flex items-center justify-between gap-3 mt-1.5">
           {/* Page Size selector */}
           <div className="flex items-center gap-2 text-xs text-[#667085]">
-            <span>Hiển thị</span>
+            <span>{t('pageSizeLabel')}</span>
             <div className="relative">
               <select
                 value={pageSize}
@@ -438,7 +444,7 @@ export function HistoryTable({ refreshSignal }: HistoryTableProps) {
               </select>
               <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#667085] pointer-events-none" />
             </div>
-            <span>/ trang</span>
+            <span>{t('perPage')}</span>
           </div>
 
           {/* Page numbers */}
