@@ -4,6 +4,11 @@ import { formatByType, markdownToPlainText } from '../services/xlsx';
 
 const router = Router();
 
+function imageUrl(url?: string | null): string {
+  if (!url) return '';
+  return url.replace(/^https?:\/\/[^/]+\/uploads\//i, '/uploads/');
+}
+
 router.get('/', async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page ?? 1));
@@ -65,9 +70,9 @@ router.get('/', async (req, res) => {
         ),
         summary: markdownToPlainText(r.synthesis ?? ''),
         cost: r.costVnd > 0 ? String(r.costVnd) : '',
-        imgTuTru: tt?.screenshotUrl ?? '',
-        imgMaiHoa: mh?.screenshotUrl ?? '',
-        imgSim: sm?.screenshotUrl ?? '',
+        imgTuTru: imageUrl(tt?.screenshotUrl),
+        imgMaiHoa: imageUrl(mh?.screenshotUrl),
+        imgSim: imageUrl(sm?.screenshotUrl),
         status: r.status,
         errorMessage: r.errorMessage,
       };

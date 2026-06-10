@@ -10,7 +10,7 @@ if (!fs.existsSync(UPLOADS_ROOT)) {
 
 /**
  * Save a base64 PNG to local disk under uploads/<readingId>/<type>.png.
- * Returns the public URL the BE will serve (relative to BACKEND public origin).
+ * Return a same-origin path so the frontend can proxy it through /uploads/*.
  */
 export function saveScreenshot(
   readingId: string,
@@ -21,10 +21,8 @@ export function saveScreenshot(
   fs.mkdirSync(readingDir, { recursive: true });
   const filePath = path.join(readingDir, `${type}.png`);
   fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
-  const publicOrigin =
-    process.env.PUBLIC_BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
   return {
-    url: `${publicOrigin}/uploads/${readingId}/${type}.png`,
+    url: `/uploads/${readingId}/${type}.png`,
     filePath,
   };
 }
