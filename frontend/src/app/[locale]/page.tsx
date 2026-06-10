@@ -213,12 +213,12 @@ export default function HomePage() {
       {showDialog && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-[#111827]/25 px-4 py-5 transition-all duration-200 sm:items-center sm:py-8"
-          onClick={dismiss}
           role="presentation"
         >
           <div
             className="w-full max-w-[560px]"
-            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
             {state.kind === 'done' ? (
               <StatusPanel

@@ -43,6 +43,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       disabled,
       className = '',
+      type = 'button',
       children,
       ...rest
     },
@@ -51,6 +52,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        type={type}
         disabled={disabled || loading}
         className={`${base} ${variantStyles[variant]} ${sizeStyles[size]} ${
           fullWidth ? 'w-full' : ''
