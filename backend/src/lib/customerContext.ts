@@ -67,6 +67,16 @@ function explicitPronounPair(addressing?: string): { narrator: string; customer:
   return { narrator, customer };
 }
 
+function explicitDisplayName(addressing?: string): string | null {
+  const clean = cleanAddressing(addressing);
+  if (!clean) return null;
+  const match = clean.match(
+    /(?:tên gọi trong bài|ten goi trong bai|cách gọi trong bài|cach goi trong bai)\s*(?:là|la|:)\s*["“]?([^"”;,]+?)["”]?(?:[;,]|$)/i,
+  );
+  const value = match?.[1]?.trim();
+  return value && value.length > 0 ? value : null;
+}
+
 function firstWord(value: string): string {
   return value.trim().split(/\s+/)[0]?.toLocaleLowerCase('vi-VN') ?? '';
 }
@@ -93,6 +103,8 @@ function displayName(customer: CustomerInfo): string {
   const name = customer.fullName.trim();
   const addressing = cleanAddressing(customer.addressing);
   const explicit = explicitPronounPair(addressing);
+  const explicitName = explicitDisplayName(addressing);
+  if (explicitName) return explicitName;
   if (!addressing) return `${defaultTitle(customer)} ${name}`;
 
   const lowerName = name.toLocaleLowerCase('vi-VN');

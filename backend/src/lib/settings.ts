@@ -2,9 +2,15 @@ import { prisma } from '../db/client';
 
 export type AiProvider = 'gemini' | 'claude';
 export type SectionKey = 'tuTru' | 'maiHoa' | 'sim' | 'synthesize';
+export type ClaudeThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'max';
 
 type SectionProviderKey = `aiProvider_${SectionKey}`;
-export type SettingKey = 'aiProvider' | 'geminiApiKey' | 'anthropicApiKey' | SectionProviderKey;
+export type SettingKey =
+  | 'aiProvider'
+  | 'geminiApiKey'
+  | 'anthropicApiKey'
+  | 'claudeThinkingLevel'
+  | SectionProviderKey;
 
 export const SECTION_KEYS: SectionKey[] = ['tuTru', 'maiHoa', 'sim', 'synthesize'];
 
@@ -16,6 +22,7 @@ const ALL_KEYS: SettingKey[] = [
   'aiProvider_maiHoa',
   'aiProvider_sim',
   'aiProvider_synthesize',
+  'claudeThinkingLevel',
 ];
 
 let cache: Partial<Record<SettingKey, string>> | null = null;
@@ -40,6 +47,10 @@ export async function warmSettingsCache(): Promise<void> {
 
 function isProvider(s: unknown): s is AiProvider {
   return s === 'gemini' || s === 'claude';
+}
+
+export function isClaudeThinkingLevel(s: unknown): s is ClaudeThinkingLevel {
+  return s === 'off' || s === 'low' || s === 'medium' || s === 'high' || s === 'max';
 }
 
 export function getAiProvider(): AiProvider {
@@ -67,6 +78,16 @@ export function getAnthropicApiKey(): string | undefined {
   return env && env.length > 0 && env !== 'your_anthropic_api_key' ? env : undefined;
 }
 
+export function getClaudeThinkingLevel(): ClaudeThinkingLevel {
+  const dbValue = cache?.claudeThinkingLevel?.trim().toLowerCase();
+  if (isClaudeThinkingLevel(dbValue)) return dbValue;
+
+  const envValue = process.env.CLAUDE_THINKING_LEVEL?.trim().toLowerCase();
+  if (isClaudeThinkingLevel(envValue)) return envValue;
+
+  return 'high';
+}
+
 function maskKey(k: string | undefined): string {
   if (!k) return '';
   if (k.length <= 8) return '••••';
@@ -76,6 +97,7 @@ function maskKey(k: string | undefined): string {
 export interface SettingsView {
   provider: AiProvider;
   sectionProviders: Record<SectionKey, AiProvider>;
+  claudeThinkingLevel: ClaudeThinkingLevel;
   geminiKey: {
     present: boolean;
     source: 'db' | 'env' | 'none';
@@ -109,6 +131,7 @@ export async function getSettingsView(): Promise<SettingsView> {
       sim: getAiProviderForSection('sim'),
       synthesize: getAiProviderForSection('synthesize'),
     },
+    claudeThinkingLevel: getClaudeThinkingLevel(),
     geminiKey: {
       present: geminiSource !== 'none',
       source: geminiSource,
@@ -125,6 +148,7 @@ export async function getSettingsView(): Promise<SettingsView> {
 export interface SettingsUpdate {
   provider?: AiProvider;
   sectionProviders?: Partial<Record<SectionKey, AiProvider | null>>;
+  claudeThinkingLevel?: ClaudeThinkingLevel | null;
   geminiApiKey?: string | null;
   anthropicApiKey?: string | null;
 }
@@ -132,6 +156,9 @@ export interface SettingsUpdate {
 export async function setSettings(updates: SettingsUpdate): Promise<void> {
   const writes: { key: SettingKey; value: string | null }[] = [];
   if (updates.provider) writes.push({ key: 'aiProvider', value: updates.provider });
+  if (updates.claudeThinkingLevel !== undefined) {
+    writes.push({ key: 'claudeThinkingLevel', value: updates.claudeThinkingLevel });
+  }
   if (updates.sectionProviders) {
     for (const section of SECTION_KEYS) {
       const v = updates.sectionProviders[section];

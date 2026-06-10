@@ -193,17 +193,13 @@ function formatSim(a: Record<string, unknown>): string {
 export function formatByType(type: PackageType, a: Record<string, unknown>): string {
   const formatted =
     type === 'tuTru' ? formatTuTru(a) : type === 'maiHoa' ? formatMaiHoa(a) : formatSim(a);
-  return formatted.trim() || fallbackFormatAnalysis(a);
+  return markdownToPlainText(formatted.trim() || fallbackFormatAnalysis(a));
 }
 
 export function markdownToPlainText(md: string): string {
   let s = md.replace(/\r\n/g, '\n');
-  s = s.replace(/^######\s+(.*)$/gm, (_, t) => t.toUpperCase());
-  s = s.replace(/^#####\s+(.*)$/gm, (_, t) => t.toUpperCase());
-  s = s.replace(/^####\s+(.*)$/gm, (_, t) => t.toUpperCase());
-  s = s.replace(/^###\s+(.*)$/gm, (_, t) => `\n— ${t.toUpperCase()} —`);
-  s = s.replace(/^##\s+(.*)$/gm, (_, t) => `\n══ ${t.toUpperCase()} ══`);
-  s = s.replace(/^#\s+(.*)$/gm, (_, t) => `\n${t.toUpperCase()}\n${'═'.repeat(Math.min(50, t.length * 2))}`);
+  s = s.replace(/^#{1,6}\s+(.*)$/gm, '$1');
+  s = s.replace(/^\s*(?:-{3,}|—{3,}|═{3,})\s*$/gm, '');
   s = s.replace(/\*\*(.+?)\*\*/g, '$1');
   s = s.replace(/\*(.+?)\*/g, '$1');
   s = s.replace(/__(.+?)__/g, '$1');

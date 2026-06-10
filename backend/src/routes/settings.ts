@@ -6,6 +6,7 @@ import {
   getGeminiApiKey,
   getAnthropicApiKey,
   warmSettingsCache,
+  isClaudeThinkingLevel,
   type AiProvider,
   type SectionKey,
 } from '../lib/settings';
@@ -62,6 +63,13 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ success: false, error: 'invalid anthropicApiKey' });
       }
       updates.anthropicApiKey = v === null ? null : v.trim();
+    }
+    if (body.claudeThinkingLevel !== undefined) {
+      const v = body.claudeThinkingLevel;
+      if (v !== null && !isClaudeThinkingLevel(v)) {
+        return res.status(400).json({ success: false, error: 'invalid claudeThinkingLevel' });
+      }
+      updates.claudeThinkingLevel = v;
     }
     if (body.sectionProviders !== undefined && typeof body.sectionProviders === 'object' && body.sectionProviders !== null) {
       const sp = body.sectionProviders as Record<string, unknown>;

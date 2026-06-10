@@ -36,6 +36,10 @@ function inferWriterPronoun(
     : 'mình';
 }
 
+function firstPronoun(value: string): string {
+  return value.trim().split(/\s+/)[0] ?? '';
+}
+
 export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) {
   const t = useTranslations('form');
 
@@ -50,7 +54,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [question, setQuestion] = useState('');
   const [writerPronoun, setWriterPronoun] = useState('');
-  const [viewerPronoun, setViewerPronoun] = useState('');
+  const [viewerDisplayName, setViewerDisplayName] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
   const [includeSynthesis, setIncludeSynthesis] = useState(false);
   const [useSolarTerms, setUseSolarTerms] = useState(true);
@@ -118,10 +122,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
     const hourNum = hour.trim() === '' ? null : Number(hour);
     const minuteNum = minute.trim() === '' ? 0 : Number(minute);
     const writer = writerPronoun.trim();
-    const viewer = viewerPronoun.trim();
+    const displayName = viewerDisplayName.trim();
+    const viewer = firstPronoun(displayName);
+    const fallbackViewer = inferViewerPronoun(gender);
+    const effectiveWriter = writer || inferWriterPronoun(viewer || fallbackViewer, gender);
+    const effectiveViewer = viewer || fallbackViewer;
     const addressing =
-      writer || viewer
-        ? `người viết xưng "${writer || inferWriterPronoun(viewer, gender)}", gọi khách là "${viewer || inferViewerPronoun(gender)}"`
+      writer || displayName
+        ? `người viết xưng "${effectiveWriter}", gọi khách là "${effectiveViewer}"${displayName ? `; tên gọi trong bài là "${displayName}"` : ''}`
         : undefined;
     onSubmit({
       fullName: fullName.trim(),
@@ -173,14 +181,14 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     <User size={12} strokeWidth={2.5} />
                   </div>
                   <span className="text-sm font-semibold text-[#475467]">
-                    Hồ sơ cơ bản
+                    THÔNG TIN NGƯỜI XEM
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-[#475467]">
-                      {t('customerName')}
+                      Tên người cần xem
                     </label>
                     <div className="relative">
                       <input
@@ -200,27 +208,27 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-semibold text-[#475467]">
-                        {t('writerPronounLabel')}
+                        Danh xưng mình tự xưng
                       </label>
                       <input
                         value={writerPronoun}
                         onChange={(e) => setWriterPronoun(e.target.value)}
-                        placeholder={t('writerPronounPlaceholder')}
+                        placeholder="Ví dụ: chị, em, mình"
                         autoComplete="off"
                         className={cellCls}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-sm font-semibold text-[#475467]">
-                        {t('viewerPronounLabel')}
+                        Danh xưng gọi người xem
                       </label>
                       <input
-                        value={viewerPronoun}
-                        onChange={(e) => setViewerPronoun(e.target.value)}
-                        placeholder={t('viewerPronounPlaceholder')}
+                        value={viewerDisplayName}
+                        onChange={(e) => setViewerDisplayName(e.target.value)}
+                        placeholder="Ví dụ: em Ly, chị Lan, bạn Hùng"
                         autoComplete="off"
                         className={cellCls}
                       />
@@ -399,7 +407,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     <MessageSquareText size={12} strokeWidth={2.5} />
                   </div>
                   <span className="text-sm font-semibold text-[#475467]">
-                    Nội dung cần xem
+                    Yêu cầu đặc biệt
                   </span>
                 </div>
 
@@ -421,12 +429,12 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-[#475467]">
-                    {t('additionalContextLabel')}
+                    Yêu cầu đặc biệt / tình thân cần thể hiện
                   </label>
                   <textarea
                     value={additionalContext}
                     onChange={(e) => setAdditionalContext(e.target.value)}
-                    placeholder={t('additionalContextPlaceholder')}
+                    placeholder="Ví dụ: em gái thân thiết, bạn nối khố 20 năm, đã lấy chồng và có 1 con gái đầu; viết thật ấm, nói thẳng vì thương, nhắc kỷ niệm nếu có"
                     rows={4}
                     className={`${cellCls} h-auto min-h-24 resize-y py-3 leading-relaxed`}
                   />

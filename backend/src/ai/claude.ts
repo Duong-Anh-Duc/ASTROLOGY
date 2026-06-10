@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 type ContentBlockParam = Anthropic.TextBlockParam | Anthropic.ImageBlockParam;
 import { getPrompt } from '../lib/store';
-import { getAnthropicApiKey } from '../lib/settings';
+import { getAnthropicApiKey, getClaudeThinkingLevel } from '../lib/settings';
 import { actualCustomerInstruction, customerBlock } from '../lib/customerContext';
 import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 
@@ -11,7 +11,14 @@ const MODEL_NAME = 'claude-sonnet-4-6';
 const ANALYSIS_TIMEOUT_MS = Number(process.env.CLAUDE_ANALYSIS_TIMEOUT_MS ?? 10 * 60_000);
 const SYNTHESIS_TIMEOUT_MS = Number(process.env.CLAUDE_SYNTHESIS_TIMEOUT_MS ?? 10 * 60_000);
 const MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS ?? 8192);
-const REPORT_MAX_TOKENS = Number(process.env.CLAUDE_REPORT_MAX_TOKENS ?? 16_000);
+const REPORT_MAX_TOKENS = Number(process.env.CLAUDE_REPORT_MAX_TOKENS ?? 24_000);
+const THINKING_OUTPUT_RESERVE = Number(process.env.CLAUDE_THINKING_OUTPUT_RESERVE ?? 4096);
+const THINKING_BUDGETS: Record<string, number> = {
+  low: 2048,
+  medium: 4096,
+  high: 8192,
+  max: 12000,
+};
 
 function getClient(): Anthropic {
   const apiKey = getAnthropicApiKey();
@@ -40,6 +47,19 @@ function extractText(message: Anthropic.Message): string {
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
     .join('');
+}
+
+function thinkingConfig(maxTokens: number): { type: 'enabled'; budget_tokens: number } | undefined {
+  const thinkingLevel = getClaudeThinkingLevel();
+  if (thinkingLevel === 'off') return undefined;
+  const requestedBudget = THINKING_BUDGETS[thinkingLevel] ?? THINKING_BUDGETS.high;
+  const budget = Math.min(requestedBudget, Math.max(0, maxTokens - THINKING_OUTPUT_RESERVE));
+  if (budget < 1024) return undefined;
+  return { type: 'enabled', budget_tokens: budget };
+}
+
+function thinkingEnabled(maxTokens: number): boolean {
+  return Boolean(thinkingConfig(maxTokens));
 }
 
 function extractToolJson(message: Anthropic.Message): Record<string, unknown> | null {
@@ -110,12 +130,17 @@ async function runClaude(
 
   let message: Anthropic.Message;
   try {
-    message = await client.messages.create({
+    const body = {
       model: MODEL_NAME,
       max_tokens: maxTokens,
       system: systemForJson,
       messages: [{ role: 'user', content: userContent }],
-    }, { timeout: timeoutMs, maxRetries: 0 });
+      thinking: thinkingConfig(maxTokens),
+    };
+    message = await client.messages.create(body as Anthropic.MessageCreateParamsNonStreaming, {
+      timeout: timeoutMs,
+      maxRetries: 0,
+    });
   } catch (err) {
     if (err instanceof Anthropic.APIConnectionTimeoutError) {
       throw new Error(`Claude timed out after ${Math.round(timeoutMs / 1000)}s`);
@@ -137,6 +162,20 @@ async function runClaudeJson(
   systemPrompt: string,
   userContent: ContentBlockParam[],
 ): Promise<{ analysis: Record<string, unknown>; usage: { input: number; output: number } }> {
+  if (thinkingEnabled(MAX_TOKENS)) {
+    const { text, usage } = await runClaude(systemPrompt, userContent, {
+      json: true,
+      timeoutMs: ANALYSIS_TIMEOUT_MS,
+      maxTokens: MAX_TOKENS,
+    });
+    try {
+      return { analysis: parseJsonSafe(text), usage };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'invalid JSON';
+      throw new Error(`Claude ${section} did not return valid JSON: ${message}`);
+    }
+  }
+
   const { text, usage, message } = await (async () => {
     const client = getClient();
     const timeoutMs = ANALYSIS_TIMEOUT_MS;

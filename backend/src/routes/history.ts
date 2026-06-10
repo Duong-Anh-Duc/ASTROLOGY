@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db/client';
-import { formatByType } from '../services/xlsx';
+import { formatByType, markdownToPlainText } from '../services/xlsx';
 
 const router = Router();
 
@@ -51,16 +51,19 @@ router.get('/', async (req, res) => {
         packages: r.packages.map((p) =>
           p === 'tuTru' ? 'Bát Tự' : p === 'maiHoa' ? 'Kinh Dịch' : 'Sim Phong Thuỷ',
         ).join(', '),
-        analysisTuTru:
+        analysisTuTru: markdownToPlainText(
           tt?.formattedText ||
-          (tt ? formatByType('tuTru', tt.analysisJson as Record<string, unknown>) : ''),
-        analysisMaiHoa:
+            (tt ? formatByType('tuTru', tt.analysisJson as Record<string, unknown>) : ''),
+        ),
+        analysisMaiHoa: markdownToPlainText(
           mh?.formattedText ||
-          (mh ? formatByType('maiHoa', mh.analysisJson as Record<string, unknown>) : ''),
-        analysisSim:
+            (mh ? formatByType('maiHoa', mh.analysisJson as Record<string, unknown>) : ''),
+        ),
+        analysisSim: markdownToPlainText(
           sm?.formattedText ||
-          (sm ? formatByType('sim', sm.analysisJson as Record<string, unknown>) : ''),
-        summary: r.synthesis ?? '',
+            (sm ? formatByType('sim', sm.analysisJson as Record<string, unknown>) : ''),
+        ),
+        summary: markdownToPlainText(r.synthesis ?? ''),
         cost: r.costVnd > 0 ? String(r.costVnd) : '',
         imgTuTru: tt?.screenshotUrl ?? '',
         imgMaiHoa: mh?.screenshotUrl ?? '',

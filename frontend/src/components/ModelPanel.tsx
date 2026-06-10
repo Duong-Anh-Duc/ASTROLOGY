@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 
 type Provider = 'gemini' | 'claude';
 type SectionKey = 'tuTru' | 'maiHoa' | 'sim' | 'synthesize';
+type ClaudeThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'max';
 
 const SECTION_KEYS: SectionKey[] = ['tuTru', 'maiHoa', 'sim', 'synthesize'];
 
@@ -19,6 +20,7 @@ interface KeyInfo {
 interface SettingsView {
   provider: Provider;
   sectionProviders: Record<SectionKey, Provider>;
+  claudeThinkingLevel: ClaudeThinkingLevel;
   geminiKey: KeyInfo;
   anthropicKey: KeyInfo;
 }
@@ -27,6 +29,8 @@ const PROVIDER_DEFS: { value: Provider; icon: typeof Sparkles; iconText: string 
   { value: 'gemini', icon: Sparkles, iconText: 'text-[#3B82F6]' },
   { value: 'claude', icon: Cpu, iconText: 'text-[#EA580C]' },
 ];
+
+const THINKING_LEVELS: ClaudeThinkingLevel[] = ['off', 'low', 'medium', 'high', 'max'];
 
 function backendUrl(path: string): string {
   const root = process.env.NEXT_PUBLIC_BACKEND_URL ?? '';
@@ -40,6 +44,7 @@ export function ModelPanel() {
   const [sectionProviders, setSectionProviders] = useState<Record<SectionKey, Provider>>({
     tuTru: 'gemini', maiHoa: 'gemini', sim: 'gemini', synthesize: 'gemini',
   });
+  const [claudeThinkingLevel, setClaudeThinkingLevel] = useState<ClaudeThinkingLevel>('high');
   const [geminiKeyDraft, setGeminiKeyDraft] = useState('');
   const [anthropicKeyDraft, setAnthropicKeyDraft] = useState('');
   const [geminiKeyOriginal, setGeminiKeyOriginal] = useState('');
@@ -65,6 +70,7 @@ export function ModelPanel() {
       const ak = keys.anthropicApiKey ?? '';
       setView(body);
       setSectionProviders(body.sectionProviders);
+      setClaudeThinkingLevel(body.claudeThinkingLevel ?? 'high');
       setGeminiKeyDraft(gk);
       setGeminiKeyOriginal(gk);
       setAnthropicKeyDraft(ak);
@@ -85,6 +91,7 @@ export function ModelPanel() {
   const dirty =
     view !== null &&
     (SECTION_KEYS.some((k) => sectionProviders[k] !== view.sectionProviders[k]) ||
+      claudeThinkingLevel !== view.claudeThinkingLevel ||
       geminiKeyDraft.trim() !== geminiKeyOriginal.trim() ||
       anthropicKeyDraft.trim() !== anthropicKeyOriginal.trim());
 
@@ -96,6 +103,7 @@ export function ModelPanel() {
       const payload: Record<string, unknown> = {
         provider: sectionProviders.synthesize,
         sectionProviders,
+        claudeThinkingLevel,
       };
       if (geminiKeyDraft.trim().length > 0) payload.geminiApiKey = geminiKeyDraft.trim();
       if (anthropicKeyDraft.trim().length > 0) payload.anthropicApiKey = anthropicKeyDraft.trim();
@@ -111,6 +119,7 @@ export function ModelPanel() {
       const body = (await res.json()) as SettingsView & { success: boolean };
       setView(body);
       setSectionProviders(body.sectionProviders);
+      setClaudeThinkingLevel(body.claudeThinkingLevel ?? 'high');
       setGeminiKeyOriginal(geminiKeyDraft.trim());
       setAnthropicKeyOriginal(anthropicKeyDraft.trim());
       setStatus('saved');
@@ -226,6 +235,39 @@ export function ModelPanel() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs font-semibold text-text-secondary">
+                    {t('claudeThinkingLabel')}
+                  </label>
+                  <span className="rounded-full bg-[#F5F3FF] px-2 py-0.5 text-[10px] font-bold uppercase text-[#7C3AED]">
+                    {claudeThinkingLevel}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                  {THINKING_LEVELS.map((level) => {
+                    const active = claudeThinkingLevel === level;
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setClaudeThinkingLevel(level)}
+                        className={`h-9 border-r border-gray-200 text-xs font-semibold capitalize transition-all last:border-r-0 ${
+                          active
+                            ? 'bg-[#7C3AED] text-white'
+                            : 'bg-white text-gray-600 hover:bg-[#F5F3FF] hover:text-[#6D28D9]'
+                        }`}
+                      >
+                        {level === 'off' ? t('thinkingOff') : level}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] leading-relaxed text-text-tertiary">
+                  {t('claudeThinkingHint')}
+                </p>
               </div>
 
               {/* Gemini key */}
