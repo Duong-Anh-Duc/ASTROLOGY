@@ -37,6 +37,21 @@ function backendUrl(path: string): string {
   return root ? `${root}${path}` : path;
 }
 
+function providerLabelKey(provider: Provider): string {
+  return provider === 'gemini' ? 'providerGemini' : 'providerClaude';
+}
+
+function thinkingLabelKey(level: ClaudeThinkingLevel): string {
+  const labels: Record<ClaudeThinkingLevel, string> = {
+    off: 'thinkingOff',
+    low: 'thinkingLow',
+    medium: 'thinkingMedium',
+    high: 'thinkingHigh',
+    max: 'thinkingMax',
+  };
+  return labels[level];
+}
+
 export function ModelPanel() {
   const t = useTranslations('model');
   const [open, setOpen] = useState(false);
@@ -169,7 +184,7 @@ export function ModelPanel() {
         {t('openButton')}
         {view?.sectionProviders.synthesize && (
           <span className="ml-1 rounded-full bg-[#F5F3FF] px-2 py-0.5 text-[10px] font-bold text-[#7C3AED] capitalize">
-            {view.sectionProviders.synthesize}
+            {t(providerLabelKey(view.sectionProviders.synthesize))}
           </span>
         )}
       </button>
@@ -185,7 +200,12 @@ export function ModelPanel() {
                 </h2>
                 <p className="text-xs text-text-tertiary">{t('subtitle')}</p>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded p-1 text-text-tertiary hover:bg-gray-100">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={t('close')}
+                className="rounded p-1 text-text-tertiary hover:bg-gray-100"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -227,7 +247,7 @@ export function ModelPanel() {
                               }`}
                             >
                               <Icon size={11} />
-                              {value}
+                              {t(providerLabelKey(value))}
                             </button>
                           );
                         })}
@@ -243,7 +263,7 @@ export function ModelPanel() {
                     {t('claudeThinkingLabel')}
                   </label>
                   <span className="rounded-full bg-[#F5F3FF] px-2 py-0.5 text-[10px] font-bold uppercase text-[#7C3AED]">
-                    {claudeThinkingLevel}
+                    {t(thinkingLabelKey(claudeThinkingLevel))}
                   </span>
                 </div>
                 <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -260,7 +280,7 @@ export function ModelPanel() {
                             : 'bg-white text-gray-600 hover:bg-[#F5F3FF] hover:text-[#6D28D9]'
                         }`}
                       >
-                        {level === 'off' ? t('thinkingOff') : level}
+                        {t(thinkingLabelKey(level))}
                       </button>
                     );
                   })}

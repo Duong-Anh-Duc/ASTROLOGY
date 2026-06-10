@@ -115,7 +115,12 @@ export function PromptsPanel() {
                 </h2>
                 <p className="text-xs text-text-tertiary">{t('subtitle')}</p>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded p-1 text-text-tertiary hover:bg-gray-100">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={t('close')}
+                className="rounded p-1 text-text-tertiary hover:bg-gray-100"
+              >
                 <X size={18} />
               </button>
             </div>
