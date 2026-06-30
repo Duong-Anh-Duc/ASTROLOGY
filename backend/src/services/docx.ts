@@ -23,7 +23,7 @@ import {
 import type { CostBreakdown } from '../lib/usage';
 import type { CustomerInfo, GeminiAnalysis, PackageType } from '../types';
 import { UPLOADS_PATH } from './storage';
-import { formatByType, markdownToPlainText, PACKAGE_LABELS } from './xlsx';
+import { formatByType, markdownToPlainText, PACKAGE_LABELS, stripInternalAnalysis } from './xlsx';
 
 const EXPORTS_DIR = path.join(UPLOADS_PATH, 'exports');
 if (!fs.existsSync(EXPORTS_DIR)) fs.mkdirSync(EXPORTS_DIR, { recursive: true });
@@ -37,15 +37,15 @@ const MUTED = '4A4A4A';
 const BORDER = 'CCCCCC';
 
 const PACKAGE_TITLE: Record<PackageType, string> = {
-  tuTru: 'BÁT TỰ CHUYÊN SÂU',
-  maiHoa: 'LUẬN GIẢI KINH DỊCH',
-  sim: 'SIM PHONG THỦY',
+  tuTru: '🎋 BÁT TỰ CHUYÊN SÂU',
+  maiHoa: '☯️ LUẬN GIẢI KINH DỊCH',
+  sim: '📱 SIM PHONG THỦY',
 };
 
 const CHART_TITLE: Record<PackageType, string> = {
-  tuTru: 'LÁ SỐ BÁT TỰ',
-  maiHoa: 'LÁ SỐ KINH DỊCH',
-  sim: 'LÁ SỐ SIM PHONG THỦY',
+  tuTru: '🎋 LÁ SỐ BÁT TỰ',
+  maiHoa: '☯️ LÁ SỐ KINH DỊCH',
+  sim: '📱 LÁ SỐ SIM PHONG THỦY',
 };
 
 const ORDER: PackageType[] = ['maiHoa', 'tuTru', 'sim'];
@@ -203,20 +203,41 @@ function metaTable(rows: [string, string][]): Table {
   });
 }
 
+// Ký hiệu trang trí đứng đầu tiêu đề (emoji, ✦, ★, ◆, ●…)
+const LEADING_DECOR =
+  /^(?:[←-⇿⌀-➿⬀-⯿☀-⛿️‍]|[\u{1F000}-\u{1FAFF}]|[★☆✦✧❖◆◇●○»→])+\s*/u;
+
+function hasLeadingDecor(line: string): boolean {
+  return LEADING_DECOR.test(line.trim());
+}
+
 function isMajorHeading(line: string): boolean {
   const clean = line.trim();
+  const stripped = clean.replace(LEADING_DECOR, '');
   return (
-    /^PHẦN\s+[IVXLC\d]+[:.]/i.test(clean) ||
-    /^\d+\.\s+[A-ZÀ-Ỹ0-9 ,&/-]{6,}$/.test(clean) ||
+    /^PHẦN\s+[IVXLC\d]+\s*[:.—–-]/i.test(stripped) ||
+    /^\d+\.\s+[A-ZÀ-Ỹ0-9 ,&/-]{6,}$/.test(stripped) ||
+    /^(?:LỜI\s+)?(?:MỞ ĐẦU|KẾT|LỜI KẾT|KẾT LUẬN|TỔNG KẾT|LỜI NHẮN(?:\s+GỬI)?|ĐÔI LỜI)\s*:?\s*$/i.test(stripped) ||
+    // Tiêu đề mục dạng IN HOA mở đầu bằng từ khoá quen thuộc, có thể có chữ theo sau
+    (/^(?:LỜI\s+MỞ\s+ĐẦU|MỞ ĐẦU|ĐÚC KẾT|LỜI KẾT|KẾT LUẬN|TỔNG KẾT|LỜI NHẮN|LUẬN GIẢI BẢN MỆNH|LÁ SỐ BẢN MỆNH)\b/i.test(stripped) &&
+      stripped.length <= 80 &&
+      stripped === stripped.toLocaleUpperCase('vi-VN')) ||
     /^#{1,3}\s+/.test(clean) ||
     /^═{2,}\s*.+\s*═{2,}$/.test(clean) ||
-    /^—\s*.+\s*—$/.test(clean)
+    /^—\s*.+\s*—$/.test(clean) ||
+    // Dòng ngắn dẫn đầu bằng emoji/ký hiệu và phần lớn IN HOA → tiêu đề
+    (hasLeadingDecor(clean) &&
+      stripped.length > 0 &&
+      stripped.length <= 80 &&
+      stripped === stripped.toLocaleUpperCase('vi-VN') &&
+      /[A-ZÀ-Ỹ]/.test(stripped))
   );
 }
 
 function normalizeHeading(line: string): string {
   return line
     .replace(/^#{1,6}\s+/, '')
+    .replace(LEADING_DECOR, '')
     .replace(/^═+\s*/, '')
     .replace(/\s*═+$/, '')
     .replace(/^—\s*/, '')
@@ -224,46 +245,229 @@ function normalizeHeading(line: string): string {
     .trim();
 }
 
-function markdownToDocxChildren(markdown: string): Paragraph[] {
-  const text = markdownToPlainText(markdown)
-    .replace(/\r\n/g, '\n')
+// Emoji chủ đề cho từng phần (giống file mẫu của khách)
+function headingEmoji(text: string): string {
+  const t = text.toLocaleLowerCase('vi-VN');
+  // Tiêu đề chính của bài (đặt trước để không bị quy tắc "bản mệnh" của PHẦN 1 bắt nhầm)
+  if (/(lá số bản mệnh|luận giải bản mệnh|báo cáo.*bản mệnh)/.test(t) || /^(lá số|báo cáo)\b/.test(t)) return '🌸';
+  if (/(mở đầu|lời ngỏ|lời mở)/.test(t)) return '✨';
+  if (/\bphần\s*1\b/.test(t) || /(bản mệnh|hình dáng|tính cách|tướng mạo)/.test(t)) return '🌿';
+  if (/\bphần\s*2\b/.test(t) || /(công việc|tài lộc|vận trình|sự nghiệp|tiền bạc)/.test(t)) return '💼';
+  if (/\bphần\s*3\b/.test(t) || /(gia đạo|phối ngẫu|hôn nhân|người chồng|người vợ|tình duyên|vợ chồng)/.test(t)) return '💞';
+  if (/\bphần\s*4\b/.test(t) || /(con cái|con của|đường con)/.test(t)) return '👥';
+  if (/\bphần\s*5\b/.test(t) || /(nhà đất|điền sản|tài sản|bất động sản|nhà cửa)/.test(t)) return '🏡';
+  if (/\bphần\s*6\b/.test(t) || /(bạn bè|quan hệ|xã hội)/.test(t)) return '🤝';
+  if (/\bphần\s*7\b/.test(t) || /(vận hạn|đại vận|lưu niên|vận trình chi tiết)/.test(t)) return '🌌';
+  if (/(lời kết|kết luận|đúc kết|lời nhắn|tổng kết)/.test(t)) return '💐';
+  return '';
+}
+
+function decorateHeading(text: string): string {
+  if (hasLeadingDecor(text)) return text; // đã có emoji từ Claude — giữ nguyên
+  const emoji = headingEmoji(text);
+  return emoji ? `${emoji} ${text}` : text;
+}
+
+/**
+ * Bỏ "tật văn AI": gạch ngang dài "—" (em dash) rải khắp nơi thay cho dấu câu.
+ * Tiêu đề → đổi thành ":" (giống "PHẦN 1: ..."); thân bài → đổi thành ", ".
+ * Giữ nguyên gạch nối ngắn "–" (en dash) dùng cho khoảng năm (2026–2027).
+ */
+function softenDash(text: string, heading = false): string {
+  let out: string;
+  if (heading) {
+    // Dấu "—" đầu tiên trong tiêu đề → ":", các dấu sau → ","
+    let first = true;
+    out = text.replace(/\s*—\s*/g, () => {
+      if (first) {
+        first = false;
+        return ': ';
+      }
+      return ', ';
+    });
+  } else {
+    out = text.replace(/\s*—\s*/g, ', ');
+  }
+  return out
+    .replace(/::+/g, ':')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+([,:])/g, '$1');
+}
+
+function isTableRow(line: string): boolean {
+  const t = line.trim();
+  return t.startsWith('|') && t.lastIndexOf('|') > 0 && t.indexOf('|', 1) > 0;
+}
+
+function isTableSeparator(line: string): boolean {
+  return /^\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?$/.test(line.trim());
+}
+
+function parseTableCells(line: string): string[] {
+  let t = line.trim();
+  if (t.startsWith('|')) t = t.slice(1);
+  if (t.endsWith('|')) t = t.slice(0, -1);
+  return t.split('|').map((cell) => cell.trim());
+}
+
+function contentTable(rows: string[][]): Table {
+  const colCount = Math.max(...rows.map((r) => r.length));
+  const colWidth = Math.round(9360 / colCount);
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    columnWidths: Array.from({ length: colCount }, () => colWidth),
+    rows: rows.map((cells, rowIdx) => {
+      const isHeader = rowIdx === 0;
+      const padded = [...cells];
+      while (padded.length < colCount) padded.push('');
+      return new TableRow({
+        tableHeader: isHeader,
+        children: padded.map(
+          (cell) =>
+            new TableCell({
+              width: { size: colWidth, type: WidthType.DXA },
+              shading: isHeader ? { type: ShadingType.CLEAR, fill: PURPLE_SOFT } : undefined,
+              verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 70, bottom: 70, left: 120, right: 120 },
+              borders: cellBorders(),
+              children: [
+                paragraph(cell, {
+                  bold: isHeader,
+                  color: isHeader ? PURPLE_DARK : TEXT,
+                  size: 21,
+                  spacingAfter: 0,
+                }),
+              ],
+            }),
+        ),
+      });
+    }),
+  });
+}
+
+function markdownToDocxChildren(markdown: string): (Paragraph | Table)[] {
+  const text = stripInternalAnalysis(
+    markdownToPlainText(markdown).replace(/\r\n/g, '\n'),
+  )
     .replace(/^\s*(?:-{3,}|—{3,}|═{3,})\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   if (!text) return [];
 
-  const blocks = text.split(/\n{2,}/);
-  const children: Paragraph[] = [];
-  for (const block of blocks) {
-    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
-    if (!lines.length) continue;
+  const lines = text.split('\n');
+  const children: (Paragraph | Table)[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
 
-    if (lines.length === 1 && isMajorHeading(lines[0])) {
-      children.push(subTitle(normalizeHeading(lines[0])));
+    // Markdown table: header row followed by a separator row (|---|---|)
+    if (isTableRow(line) && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      const header = parseTableCells(line);
+      const body: string[][] = [];
+      i += 2;
+      while (i < lines.length && isTableRow(lines[i].trim()) && !isTableSeparator(lines[i].trim())) {
+        body.push(parseTableCells(lines[i].trim()));
+        i += 1;
+      }
+      children.push(contentTable([header, ...body]));
+      children.push(emptyLine());
       continue;
     }
 
-    for (const line of lines) {
-      if (isMajorHeading(line)) {
-        children.push(subTitle(normalizeHeading(line)));
-      } else if (/^[•*-]\s+/.test(line)) {
-        children.push(
-          paragraph(line.replace(/^[•*-]\s+/, ''), {
-            size: 23,
-            spacingAfter: 90,
-            indentLeft: 360,
-          }),
-        );
-      } else {
-        children.push(paragraph(line, { size: 24, spacingAfter: 140 }));
-      }
+    if (!line) {
+      i += 1;
+      continue;
     }
+
+    if (isMajorHeading(line)) {
+      // Giữ emoji Claude đã đặt; nếu chưa có thì tự gắn emoji chủ đề.
+      const heading = hasLeadingDecor(line)
+        ? line.replace(/^#{1,6}\s+/, '').trim()
+        : decorateHeading(normalizeHeading(line));
+      children.push(subTitle(softenDash(heading, true)));
+    } else if (/^[•*-]\s+/.test(line)) {
+      children.push(
+        paragraph(softenDash(line.replace(/^[•*-]\s+/, '')), {
+          size: 23,
+          spacingAfter: 90,
+          indentLeft: 360,
+        }),
+      );
+    } else {
+      children.push(paragraph(softenDash(line), { size: 24, spacingAfter: 140 }));
+    }
+    i += 1;
   }
   return children;
 }
 
 function cleanProseMode(packages: PackageType[], finalContent: string): boolean {
   return packages.length === 1 && packages[0] === 'maiHoa' && !finalContent.trim();
+}
+
+// ===== Hỗ trợ layout "bản mệnh hợp nhất" (Kinh Dịch + Bát Tự thành 1 bài) =====
+
+/** Tách phần "lời kết / đúc kết" ra khỏi thân bài. */
+function splitLoiKet(text: string): { body: string; loiket: string } {
+  const lines = text.split('\n');
+  const re = /^[★☆✦✧❖◆◇●○»→\s🌸🌿💼💞👥🏡🤝🌌💐]*(?:lời\s*kết|đúc\s*kết|lời\s*nhắn)/i;
+  for (let i = 0; i < lines.length; i++) {
+    if (re.test(lines[i].trim())) {
+      return { body: lines.slice(0, i).join('\n').trim(), loiket: lines.slice(i).join('\n').trim() };
+    }
+  }
+  return { body: text.trim(), loiket: '' };
+}
+
+/** Bỏ dòng tiêu đề lớn (🌸 / "LUẬN GIẢI BẢN MỆNH" / "LÁ SỐ BÁT TỰ"…) ở đầu. */
+function stripLeadingTitle(text: string): string {
+  const lines = text.split('\n');
+  while (lines.length && !lines[0].trim()) lines.shift();
+  if (lines.length) {
+    const t = lines[0].trim();
+    if (
+      hasLeadingDecor(t) ||
+      /(luận giải|lá số|báo cáo)[^\n]*(bản mệnh|bát tự|kinh dịch|tứ trụ)/i.test(t)
+    ) {
+      lines.shift();
+    }
+  }
+  return lines.join('\n').trim();
+}
+
+/** Bỏ lời chào mở đầu ("Chào chị …, " / "Kính chào …"). */
+function stripGreeting(text: string): string {
+  return text.replace(/^\s*(?:kính\s+)?chào\s+(?:chị|anh|cô|chú|bạn|ông|bà)[^.\n]*[.,]\s*/i, '').trimStart();
+}
+
+/** Bỏ chữ ký/cụm kết ở cuối (Thương mến, Bùi Linh Tường Vân, Chuyên gia phong thủy). */
+function stripSignature(text: string): string {
+  const lines = text.split('\n');
+  while (lines.length) {
+    const last = lines[lines.length - 1].trim();
+    if (!last || /^(thương mến|trân trọng|kính bút|bùi linh tường vân|chuyên gia phong th)/i.test(last)) {
+      lines.pop();
+      continue;
+    }
+    break;
+  }
+  return lines.join('\n').trim();
+}
+
+function ensureTitle(children: (Paragraph | Table)[], body: string, fullName: string): void {
+  const first = body.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+  const hasTitle = hasLeadingDecor(first) || /(luận giải bản mệnh|lá số bản mệnh|báo cáo)/i.test(first);
+  if (!hasTitle) {
+    children.push(
+      paragraph(`🌸 LUẬN GIẢI BẢN MỆNH – ${fullName.toLocaleUpperCase('vi-VN')} 🌸`, {
+        bold: true,
+        color: PURPLE_DARK,
+        size: 30,
+        alignment: AlignmentType.CENTER,
+        spacingAfter: 220,
+      }),
+    );
+  }
 }
 
 function imageType(data: Buffer): 'jpg' | 'png' {
@@ -327,11 +531,79 @@ export async function generateDocx(input: GenerateDocxInput): Promise<GenerateDo
   if (cleanProse) {
     const onlyAnalysis = orderedAnalyses[0];
     if (onlyAnalysis) {
-      children.push(...markdownToDocxChildren(formatByType(onlyAnalysis.type, onlyAnalysis.analysis)));
+      const imgPath = screenshotPaths?.[onlyAnalysis.type];
+      const img = imgPath ? imageParagraph(imgPath) : null;
+      if (img) children.push(img, emptyLine());
+
+      const formatted = formatByType(onlyAnalysis.type, onlyAnalysis.analysis);
+      // Nếu Claude chưa tự viết tiêu đề lớn ở đầu, tự chèn tiêu đề 🌸.
+      const firstLine = formatted.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+      const hasTitle =
+        hasLeadingDecor(firstLine) ||
+        /(luận giải bản mệnh|lá số bản mệnh|báo cáo|luận giải kinh dịch)/i.test(firstLine);
+      if (!hasTitle) {
+        children.push(
+          paragraph(`🌸 LUẬN GIẢI BẢN MỆNH KINH DỊCH – ${customer.fullName.toLocaleUpperCase('vi-VN')} 🌸`, {
+            bold: true,
+            color: PURPLE_DARK,
+            size: 30,
+            alignment: AlignmentType.CENTER,
+            spacingAfter: 220,
+          }),
+        );
+      }
+      children.push(...markdownToDocxChildren(formatted));
+    }
+  } else if (
+    packages.includes('maiHoa') &&
+    packages.includes('tuTru') &&
+    !finalContent.trim()
+  ) {
+    // ===== Layout HỢP NHẤT: 1 bài liền mạch, Bát Tự là PHẦN 8 (như bản mẫu) =====
+    const maiHoa = orderedAnalyses.find((a) => a.type === 'maiHoa');
+    const tuTru = orderedAnalyses.find((a) => a.type === 'tuTru');
+    const sim = orderedAnalyses.find((a) => a.type === 'sim');
+
+    // Ảnh quẻ ở đầu
+    for (const a of [maiHoa, tuTru, sim]) {
+      if (!a) continue;
+      const ip = screenshotPaths?.[a.type];
+      const img = ip ? imageParagraph(ip) : null;
+      if (img) children.push(img, emptyLine());
+    }
+
+    // Kinh Dịch: thân bài (giữ tiêu đề + lời chào + PHẦN 1-7), tách lời kết để dồn xuống cuối
+    const kd = splitLoiKet(formatByType('maiHoa', maiHoa!.analysis));
+    ensureTitle(children, kd.body, customer.fullName);
+    children.push(...markdownToDocxChildren(kd.body));
+
+    // PHẦN 8: BÁT TỰ (bỏ tiêu đề + lời chào + chữ ký + lời kết riêng của bài Bát Tự)
+    const btBody = stripSignature(stripGreeting(stripLeadingTitle(splitLoiKet(formatByType('tuTru', tuTru!.analysis)).body)));
+    children.push(emptyLine(), sectionTitle('🎋 PHẦN 8: BÁT TỰ CHUYÊN SÂU'));
+    children.push(...markdownToDocxChildren(btBody));
+
+    // Sim (nếu có) → PHẦN 9
+    if (sim) {
+      const simBody = stripSignature(stripGreeting(stripLeadingTitle(splitLoiKet(formatByType('sim', sim.analysis)).body)));
+      children.push(emptyLine(), sectionTitle('📱 PHẦN 9: SIM PHONG THỦY'));
+      children.push(...markdownToDocxChildren(simBody));
+    }
+
+    // Một LỜI KẾT duy nhất ở cuối (ưu tiên lời kết của Kinh Dịch)
+    const loiket = kd.loiket || splitLoiKet(formatByType('tuTru', tuTru!.analysis)).loiket;
+    children.push(emptyLine());
+    if (loiket) {
+      children.push(...markdownToDocxChildren(loiket));
+    } else {
+      children.push(
+        paragraph('Thương mến,', { italics: true, size: 24, spacingBefore: 220 }),
+        paragraph('Bùi Linh Tường Vân', { bold: true, color: PURPLE_DARK, size: 26, spacingAfter: 40 }),
+        paragraph('Chuyên gia phong thủy', { italics: true, color: MUTED, size: 22 }),
+      );
     }
   } else {
     children.push(
-      paragraph(reportTitle(packages), {
+      paragraph(`🪷 ${reportTitle(packages)}`, {
         bold: true,
         color: PURPLE,
         size: 36,
@@ -373,7 +645,7 @@ export async function generateDocx(input: GenerateDocxInput): Promise<GenerateDo
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
     if (finalContent.trim()) {
-      children.push(sectionTitle('PHẦN I: TỔNG HỢP CHUNG'));
+      children.push(sectionTitle('🧭 PHẦN I: TỔNG HỢP CHUNG'));
       children.push(...markdownToDocxChildren(finalContent));
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }

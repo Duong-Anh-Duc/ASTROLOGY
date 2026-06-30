@@ -193,11 +193,85 @@ function formatSim(a: Record<string, unknown>): string {
 export function formatByType(type: PackageType, a: Record<string, unknown>): string {
   const formatted =
     type === 'tuTru' ? formatTuTru(a) : type === 'maiHoa' ? formatMaiHoa(a) : formatSim(a);
-  return markdownToPlainText(formatted.trim() || fallbackFormatAnalysis(a));
+  return stripInternalAnalysis(markdownToPlainText(formatted.trim() || fallbackFormatAnalysis(a)));
+}
+
+const DECOR = '[★☆✦✧❖◆◇●○»→\\s🌸🌿💼💞👥🏡🤝🌌💐]*?';
+
+/** Dòng tiêu đề/đề mục lớn của bài (tiêu đề chính, lời chào, MỞ ĐẦU, PHẦN n). */
+function isReportStart(line: string): boolean {
+  const t = line.trim();
+  return (
+    // Lời chào: "Chào chị...", "Kính chào anh...", "Kính gửi...", "Kính thưa..."
+    /^(?:kính\s+)?(?:chào|gửi|thưa)\s+(?:chị|anh|em|bạn|cô|chú|ông|bà|quý|các|toàn)/i.test(t) ||
+    // Tiêu đề bài luận
+    new RegExp(`^${DECOR}(?:bản\\s+luận\\s+giải|lá số bản mệnh|luận giải bản mệnh|báo cáo lá số)`, 'i').test(t) ||
+    /dành cho khách\s*hàng/i.test(t) ||
+    new RegExp(`^${DECOR}(?:lời\\s+)?mở đầu\\b`, 'i').test(t)
+  );
+}
+
+/** Điểm bắt đầu phần CHO KHÁCH sau khối nội bộ (gồm cả MỞ ĐẦU / PHẦN n). */
+function isBodyStart(line: string): boolean {
+  const t = line.trim();
+  return isReportStart(t) || new RegExp(`^${DECOR}PHẦN\\s+[IVXLC\\d]`, 'i').test(t);
+}
+
+/**
+ * Cắt bỏ phần "phân tích nội bộ / đọc quẻ" mà Claude đôi khi vẫn in ra dù được
+ * dặn chỉ dùng nội bộ. Chỉ cắt khi nhận diện rõ phần nội bộ VÀ tìm được điểm bắt
+ * đầu phần luận giải cho khách (an toàn: không tìm được ranh giới thì giữ nguyên).
+ */
+export function stripInternalAnalysis(text: string): string {
+  const lines = text.split('\n');
+  const head = lines.slice(0, 90);
+  const headText = head.join('\n');
+
+  // Dấu hiệu bằng câu chữ (linh hoạt — chấp nhận từ chen giữa).
+  const internalRe =
+    /(phân tích[^\n]{0,15}nội bộ|nội bộ[^\n]{0,15}(?:trước khi|không )|đọc quẻ\s*(?:trước|:)|trước khi luận giải|phần kỹ thuật|kỹ thuật nội bộ|không (?:hiển thị|dành|phải)[^\n]{0,40}cho khách|dành cho (?:chuyên gia|quy trình|thầy)|nạp can|lục thân xác định)/i;
+
+  // Dấu hiệu theo cấu trúc: nhiều thuật ngữ kỹ thuật xuất hiện ở đầu bài
+  // (bài luận sạch cho khách sẽ không liệt kê hàng loạt các mục này).
+  const techMarkers = [
+    /quẻ chủ/i, /quẻ biến/i, /hỗ quái/i, /hào động/i, /hào thế/i, /hào ứng/i,
+    /tử tôn/i, /phụ mẫu/i, /huynh đệ/i, /quan quỷ/i, /thê tài/i,
+    /nhật thần/i, /nguyệt lệnh/i, /tuần không/i, /phục (?:thần|tàng)/i,
+  ];
+  const markerCount = techMarkers.filter((re) => re.test(headText)).length;
+  const hasInternal = internalRe.test(headText) || markerCount >= 4;
+  if (!hasInternal) return text;
+
+  // 1) Tìm dòng BẮT ĐẦU khối nội bộ (trong ~90 dòng đầu).
+  let blockStart = head.findIndex((l) => internalRe.test(l));
+  if (blockStart === -1) {
+    // không có câu dấu hiệu → khối liệt kê kỹ thuật: dòng đánh số đầu tiên có thuật ngữ
+    blockStart = head.findIndex(
+      (l) => /^\s*\d+[.)]\s/.test(l) && techMarkers.some((re) => re.test(l)),
+    );
+  }
+  if (blockStart === -1) return text;
+
+  // 2) Tìm điểm KẾT THÚC = dòng mở đầu phần cho khách, nằm SAU khối nội bộ.
+  let bodyStart = -1;
+  for (let i = blockStart + 1; i < lines.length; i++) {
+    if (isBodyStart(lines[i])) {
+      bodyStart = i;
+      break;
+    }
+  }
+  if (bodyStart === -1) return text; // không tìm được điểm kết → giữ nguyên cho an toàn
+
+  // 3) Giữ phần TRƯỚC khối (tiêu đề) + phần body; bỏ khối nội bộ ở giữa.
+  return [...lines.slice(0, blockStart), ...lines.slice(bodyStart)]
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function markdownToPlainText(md: string): string {
   let s = md.replace(/\r\n/g, '\n');
+  s = s.replace(/^\s*>\s?/gm, ''); // bỏ dấu trích dẫn blockquote ">"
   s = s.replace(/^#{1,6}\s+(.*)$/gm, '$1');
   s = s.replace(/^\s*(?:-{3,}|—{3,}|═{3,})\s*$/gm, '');
   s = s.replace(/\*\*(.+?)\*\*/g, '$1');

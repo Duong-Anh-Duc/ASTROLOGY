@@ -3,7 +3,7 @@
 import { BookOpen, Calendar, ChevronDown, Clock, Compass, Info, MessageSquareText, Phone, Sparkles, User, Shield, Check } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ConfigProvider, DatePicker } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import enUS from 'antd/locale/en_US';
@@ -20,26 +20,29 @@ interface DivinationFormProps {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-function inferViewerPronoun(gender: 'male' | 'female' | 'other'): string {
-  return gender === 'female' ? 'chị' : 'anh';
+const PACKAGES_STORAGE_KEY = 'divination.packages';
+const SYNTHESIS_STORAGE_KEY = 'divination.includeSynthesis';
+const ALL_PACKAGES: PackageType[] = ['tuTru', 'maiHoa', 'sim'];
+
+function loadStoredPackages(): PackageType[] {
+  if (typeof window === 'undefined') return ALL_PACKAGES;
+  try {
+    const raw = window.localStorage.getItem(PACKAGES_STORAGE_KEY);
+    if (!raw) return ALL_PACKAGES;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((p): p is PackageType => ALL_PACKAGES.includes(p));
+      if (valid.length > 0) return valid;
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  return ALL_PACKAGES;
 }
 
-function inferWriterPronoun(
-  viewerPronoun: string,
-  gender: 'male' | 'female' | 'other',
-): string {
-  const normalized = viewerPronoun.trim().toLocaleLowerCase('vi-VN');
-  if (normalized === 'em') return 'chị';
-  if (normalized === 'bạn') return 'mình';
-  if (normalized === 'cậu') return 'tớ';
-  if (normalized === 'mình') return 'bạn';
-  return inferViewerPronoun(gender) === 'chị' || inferViewerPronoun(gender) === 'anh'
-    ? 'em'
-    : 'mình';
-}
-
-function firstPronoun(value: string): string {
-  return value.trim().split(/\s+/)[0] ?? '';
+function loadStoredSynthesis(): boolean {
+  if (typeof window === 'undefined') return true;
+  return window.localStorage.getItem(SYNTHESIS_STORAGE_KEY) !== 'false';
 }
 
 export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) {
@@ -54,15 +57,34 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   const [minute, setMinute] = useState<string>('');
   const [isLunar, setIsLunar] = useState<boolean>(false);
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
+  const [viewerPronoun, setViewerPronoun] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [question, setQuestion] = useState('');
-  const [writerPronoun, setWriterPronoun] = useState('');
-  const [viewerDisplayName, setViewerDisplayName] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
-  const [includeSynthesis, setIncludeSynthesis] = useState(false);
+  const [includeSynthesis, setIncludeSynthesis] = useState(true);
   const [useSolarTerms, setUseSolarTerms] = useState(true);
-  const [packages, setPackages] = useState<PackageType[]>(['tuTru', 'maiHoa', 'sim']);
+  const [packages, setPackages] = useState<PackageType[]>(ALL_PACKAGES);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Khôi phục lựa chọn đã lưu sau khi mount (tránh lệch SSR/CSR)
+  useEffect(() => {
+    setPackages(loadStoredPackages());
+    setIncludeSynthesis(loadStoredSynthesis());
+  }, []);
+
+  // Lưu trực tiếp khi người dùng thay đổi (không lưu trong effect để tránh ghi đè lúc mount)
+  const persistPackages = (next: PackageType[]) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(PACKAGES_STORAGE_KEY, JSON.stringify(next));
+  };
+  const persistSynthesis = (next: boolean) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SYNTHESIS_STORAGE_KEY, String(next));
+  };
+  const updateSynthesis = (next: boolean) => {
+    setIncludeSynthesis(next);
+    persistSynthesis(next);
+  };
 
   const clearError = (field: string) => {
     setErrors((prev) => {
@@ -74,16 +96,16 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
   };
 
   const togglePackage = (pkg: PackageType) => {
-    setPackages((prev) => {
-      const next = prev.includes(pkg)
-        ? prev.filter((p) => p !== pkg)
-        : [...prev, pkg];
+    const next = packages.includes(pkg)
+      ? packages.filter((p) => p !== pkg)
+      : [...packages, pkg];
 
-      if (next.length > 0) clearError('packages');
-      if (!next.includes('sim')) clearError('phoneNumber');
-      if (next.length < 2) setIncludeSynthesis(false);
-      return next;
-    });
+    setPackages(next);
+    persistPackages(next);
+
+    if (next.length > 0) clearError('packages');
+    if (!next.includes('sim')) clearError('phoneNumber');
+    if (next.length < 2) updateSynthesis(false);
   };
 
   const validate = (): boolean => {
@@ -124,16 +146,6 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
     if (!validate()) return;
     const hourNum = hour.trim() === '' ? null : Number(hour);
     const minuteNum = minute.trim() === '' ? 0 : Number(minute);
-    const writer = writerPronoun.trim();
-    const displayName = viewerDisplayName.trim();
-    const viewer = firstPronoun(displayName);
-    const fallbackViewer = inferViewerPronoun(gender);
-    const effectiveWriter = writer || inferWriterPronoun(viewer || fallbackViewer, gender);
-    const effectiveViewer = viewer || fallbackViewer;
-    const addressing =
-      writer || displayName
-        ? `người viết xưng "${effectiveWriter}", gọi khách là "${effectiveViewer}"${displayName ? `; tên gọi trong bài là "${displayName}"` : ''}`
-        : undefined;
     onSubmit({
       fullName: fullName.trim(),
       day: Number(day),
@@ -146,7 +158,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
       packages,
       phoneNumber: packages.includes('sim') ? phoneNumber.trim() : undefined,
       question: question.trim() ? question.trim() : undefined,
-      addressing,
+      addressing: viewerPronoun.trim() ? viewerPronoun.trim() : undefined,
       additionalContext: additionalContext.trim() ? additionalContext.trim() : undefined,
       includeSynthesis: packages.length > 1 && includeSynthesis,
       useSolarTerms: useSolarTerms,
@@ -211,32 +223,23 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-semibold text-[#475467]">
-                        {t('writerPronounLabel')}
-                      </label>
-                      <input
-                        value={writerPronoun}
-                        onChange={(e) => setWriterPronoun(e.target.value)}
-                        placeholder={t('writerPronounPlaceholder')}
-                        autoComplete="off"
-                        className={cellCls}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-semibold text-[#475467]">
-                        {t('viewerPronounLabel')}
-                      </label>
-                      <input
-                        value={viewerDisplayName}
-                        onChange={(e) => setViewerDisplayName(e.target.value)}
-                        placeholder={t('viewerPronounPlaceholder')}
-                        autoComplete="off"
-                        className={cellCls}
-                      />
-                    </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-[#475467]">
+                      {t('viewerPronounLabel')}
+                      <span className="ml-1 font-normal text-[#98A2B3]">(tùy chọn)</span>
+                    </label>
+                    <input
+                      value={viewerPronoun}
+                      onChange={(e) => setViewerPronoun(e.target.value)}
+                      placeholder={t('viewerPronounPlaceholder')}
+                      autoComplete="off"
+                      className={cellCls}
+                    />
+                    <span className="text-[11px] text-[#98A2B3]">
+                      Để trống = tự suy theo giới tính (nam → anh, nữ → chị).
+                    </span>
                   </div>
+
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-1">
@@ -588,7 +591,7 @@ export function DivinationForm({ onSubmit, isSubmitting }: DivinationFormProps) 
             <button
               type="button"
               disabled={!canSynthesize}
-              onClick={() => setIncludeSynthesis((prev) => !prev)}
+              onClick={() => updateSynthesis(!includeSynthesis)}
               className={`flex w-full items-start gap-4 rounded-xl border px-4 py-3.5 text-left transition-all shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${
                 !canSynthesize
                   ? 'cursor-not-allowed border-[#E5E7EB] bg-[#F7F8FA] opacity-60'

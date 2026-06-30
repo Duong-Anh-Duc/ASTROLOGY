@@ -4,6 +4,7 @@ import {
   DEFAULT_PROMPT_SIM,
   DEFAULT_PROMPT_SYNTHESIZE,
   DEFAULT_PROMPT_TU_TRU,
+  STYLE_GUIDE_LASO,
 } from './defaults';
 
 export type PromptKey = 'tuTru' | 'maiHoa' | 'sim' | 'synthesize';
@@ -32,7 +33,13 @@ async function loadAll(): Promise<Partial<Record<PromptKey, string>>> {
 
 export function getPrompt(key: PromptKey): string {
   const v = cache?.[key];
-  return v ?? DEFAULTS[key];
+  const base = v ?? DEFAULTS[key];
+  // Lớp phong cách dùng chung — ghép vào đầu mọi bài Bát Tự & Kinh Dịch,
+  // bất kể khách dán prompt gì, để khách nào cũng ra cùng một giọng văn.
+  if (key === 'tuTru' || key === 'maiHoa') {
+    return `${STYLE_GUIDE_LASO}\n\n${base}`;
+  }
+  return base;
 }
 
 export async function warmPromptCache(): Promise<void> {

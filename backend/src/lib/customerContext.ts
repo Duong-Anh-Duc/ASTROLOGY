@@ -99,21 +99,29 @@ function canonicalTitle(title: string): string {
   return map[title] ?? title;
 }
 
+/** Tên gọi thân mật: bỏ họ + đệm, lấy phần tên. "Trần Thị Ngọc Loan" -> "Ngọc Loan". */
+function givenName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 3) return parts.slice(2).join(' ');
+  return parts[parts.length - 1] ?? fullName.trim();
+}
+
 function displayName(customer: CustomerInfo): string {
   const name = customer.fullName.trim();
+  const shortName = givenName(name); // gọi bằng tên ngắn cho thân mật, tự nhiên
   const addressing = cleanAddressing(customer.addressing);
   const explicit = explicitPronounPair(addressing);
   const explicitName = explicitDisplayName(addressing);
   if (explicitName) return explicitName;
-  if (!addressing) return `${defaultTitle(customer)} ${name}`;
+  if (!addressing) return `${defaultTitle(customer)} ${shortName}`;
 
   const lowerName = name.toLocaleLowerCase('vi-VN');
   const lowerAddressing = addressing.toLocaleLowerCase('vi-VN');
   if (lowerAddressing.includes(lowerName)) return addressing;
-  if (explicit?.customer) return `${explicit.customer} ${name}`;
-  if (TITLE_RE.test(addressing)) return `${addressing} ${name}`;
+  if (explicit?.customer) return `${explicit.customer} ${shortName}`;
+  if (TITLE_RE.test(addressing)) return `${addressing} ${shortName}`;
   if (TITLE_RE.test(firstWord(addressing))) return addressing;
-  return `${defaultTitle(customer)} ${name}`;
+  return `${defaultTitle(customer)} ${shortName}`;
 }
 
 function customerPronoun(customer: CustomerInfo): string {
@@ -163,7 +171,7 @@ ${customerBlock(customer)}
 QUY TẮC BẮT BUỘC:
 - Luôn dùng dữ liệu thực tế ở trên; mọi tên, danh xưng, ví dụ hoặc tình tiết trong prompt hệ thống chỉ là mẫu nếu khác dữ liệu trên.
 - Khóa cứng cặp xưng hô ở dòng "Cặp xưng hô bắt buộc". Từ câu chào, tiêu đề, các phần thân bài đến lời kết đều chỉ dùng đúng cặp này. Không đổi qua lại giữa anh/chị/bạn/em/mình/tớ/cậu hoặc bất kỳ đại từ nào khác ngoài cặp đã khóa.
-- Khi viết tiêu đề hoặc mở bài, dùng đúng "Tên gọi trong bài" hoặc "Cách gọi khách khi chào/mở bài". Trong nội dung, gọi khách bằng đúng đại từ đã khóa, không tự suy theo tuổi nếu input đã có cách xưng hô.
+- Lời chào và TOÀN BỘ thân bài gọi khách bằng "Tên gọi trong bài" (tên ngắn, ví dụ "chị Ngọc Loan" hoặc gọn hơn là "chị Loan"). TUYỆT ĐỐI KHÔNG gọi đầy đủ họ tên ("chị Trần Thị Ngọc Loan") trong lời chào hay thân bài. Họ tên đầy đủ chỉ được dùng tối đa MỘT lần ở dòng tiêu đề lớn (nếu cần), không lặp lại.
 - Khi luận nạp âm năm sinh, dùng dòng "Năm sinh tham chiếu theo năm nhập" làm mốc kiểm tra. Không tự đổi nạp âm năm sinh sang mệnh khác nếu lá số nguồn không chứng minh rõ.
 - Không tự thêm biến cố, con cái, hôn nhân hoặc nhu cầu chưa được nêu.`;
 }
